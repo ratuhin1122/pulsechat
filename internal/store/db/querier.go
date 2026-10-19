@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) (RoomMember, error)
+	CompleteImageAttachment(ctx context.Context, arg CompleteImageAttachmentParams) (int64, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateMemberMessage(ctx context.Context, arg CreateMemberMessageParams) (Message, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)

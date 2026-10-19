@@ -19,6 +19,7 @@ type Repository interface {
 	GetAttachment(context.Context, pgtype.UUID) (db.Attachment, error)
 	MarkAttachmentReady(context.Context, pgtype.UUID) (int64, error)
 	RejectAttachment(context.Context, db.RejectAttachmentParams) (int64, error)
+	CompleteImageAttachment(context.Context, db.CompleteImageAttachmentParams) (int64, error)
 }
 
 type AttachmentHandler struct {
@@ -26,10 +27,15 @@ type AttachmentHandler struct {
 	logger  *slog.Logger
 	storage storage.Storage
 	scanner Scanner
+	images  ImageProcessor
 }
 
-func NewAttachmentHandler(repo Repository, disk storage.Storage, scanner Scanner, logger *slog.Logger) *AttachmentHandler {
-	return &AttachmentHandler{repo: repo, storage: disk, scanner: scanner, logger: logger}
+func NewAttachmentHandler(repo Repository, disk storage.Storage, scanner Scanner, logger *slog.Logger, images ...ImageProcessor) *AttachmentHandler {
+	h := &AttachmentHandler{repo: repo, storage: disk, scanner: scanner, logger: logger}
+	if len(images) > 0 {
+		h.images = images[0]
+	}
+	return h
 }
 
 func (h *AttachmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) error {
@@ -49,6 +55,9 @@ func (h *AttachmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 		return fmt.Errorf("load attachment: %w", err)
 	}
 	if attachment.Status == "ready" {
+		if attachment.QuarantineName.Valid {
+			return h.deleteOriginal(ctx, attachment.QuarantineName.String)
+		}
 		return nil
 	}
 	if attachment.Status == "rejected" {
@@ -68,6 +77,9 @@ func (h *AttachmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 	}
 	if result.Threat != "" {
 		return h.reject(ctx, attachment, "malware detected: "+result.Threat)
+	}
+	if attachment.Kind == "image" {
+		return h.processImage(ctx, attachment)
 	}
 	updated, err := h.repo.MarkAttachmentReady(ctx, id)
 	if err != nil {

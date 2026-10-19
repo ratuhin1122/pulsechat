@@ -15,9 +15,14 @@ import (
 )
 
 type testRepository struct {
-	get    func(context.Context, pgtype.UUID) (db.Attachment, error)
-	mark   func(context.Context, pgtype.UUID) (int64, error)
-	reject func(context.Context, db.RejectAttachmentParams) (int64, error)
+	get      func(context.Context, pgtype.UUID) (db.Attachment, error)
+	mark     func(context.Context, pgtype.UUID) (int64, error)
+	reject   func(context.Context, db.RejectAttachmentParams) (int64, error)
+	complete func(context.Context, db.CompleteImageAttachmentParams) (int64, error)
+}
+
+func (r *testRepository) CompleteImageAttachment(ctx context.Context, p db.CompleteImageAttachmentParams) (int64, error) {
+	return r.complete(ctx, p)
 }
 
 func (r *testRepository) GetAttachment(ctx context.Context, id pgtype.UUID) (db.Attachment, error) {

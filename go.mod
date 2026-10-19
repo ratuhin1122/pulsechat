@@ -4,7 +4,9 @@ go 1.26.0
 
 require (
 	github.com/alicebob/miniredis/v2 v2.35.0
+	github.com/bbrks/go-blurhash v1.1.1
 	github.com/coder/websocket v1.8.14
+	github.com/davidbyttow/govips/v2 v2.17.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/hibiken/asynq v0.25.1
 	github.com/jackc/pgx/v5 v5.7.6
@@ -23,6 +25,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect

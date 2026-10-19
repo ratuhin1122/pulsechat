@@ -24,3 +24,11 @@ UPDATE attachments SET status = 'ready', rejection_reason = NULL WHERE id = $1 A
 -- name: RejectAttachment :execrows
 UPDATE attachments SET status = 'rejected', rejection_reason = sqlc.arg(reason)::text
 WHERE id = sqlc.arg(id) AND status <> 'rejected';
+
+-- name: CompleteImageAttachment :execrows
+UPDATE attachments SET quarantine_name = stored_name,
+    stored_name = sqlc.arg(display_name), thumbnail_name = sqlc.arg(thumbnail_name)::text,
+    mime_type = 'image/webp', size_bytes = sqlc.arg(size_bytes),
+    width = sqlc.arg(width)::integer, height = sqlc.arg(height)::integer,
+    blurhash = sqlc.arg(blurhash)::text, status = 'ready', rejection_reason = NULL
+WHERE id = sqlc.arg(id) AND status = 'pending';

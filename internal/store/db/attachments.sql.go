@@ -11,11 +11,46 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completeImageAttachment = `-- name: CompleteImageAttachment :execrows
+UPDATE attachments SET quarantine_name = stored_name,
+    stored_name = $1, thumbnail_name = $2::text,
+    mime_type = 'image/webp', size_bytes = $3,
+    width = $4::integer, height = $5::integer,
+    blurhash = $6::text, status = 'ready', rejection_reason = NULL
+WHERE id = $7 AND status = 'pending'
+`
+
+type CompleteImageAttachmentParams struct {
+	DisplayName   string
+	ThumbnailName string
+	SizeBytes     int64
+	Width         int32
+	Height        int32
+	Blurhash      string
+	ID            pgtype.UUID
+}
+
+func (q *Queries) CompleteImageAttachment(ctx context.Context, arg CompleteImageAttachmentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeImageAttachment,
+		arg.DisplayName,
+		arg.ThumbnailName,
+		arg.SizeBytes,
+		arg.Width,
+		arg.Height,
+		arg.Blurhash,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createAttachment = `-- name: CreateAttachment :one
 INSERT INTO attachments (
     message_id, kind, original_name, stored_name, mime_type, size_bytes,
     width, height, duration_sec, blurhash
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason, thumbnail_name, quarantine_name
 `
 
 type CreateAttachmentParams struct {
@@ -60,6 +95,8 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.Status,
 		&i.CreatedAt,
 		&i.RejectionReason,
+		&i.ThumbnailName,
+		&i.QuarantineName,
 	)
 	return i, err
 }
@@ -77,7 +114,7 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id pgtype.UUID) (int64, 
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason FROM attachments WHERE id = $1
+SELECT id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason, thumbnail_name, quarantine_name FROM attachments WHERE id = $1
 `
 
 func (q *Queries) GetAttachment(ctx context.Context, id pgtype.UUID) (Attachment, error) {
@@ -98,12 +135,14 @@ func (q *Queries) GetAttachment(ctx context.Context, id pgtype.UUID) (Attachment
 		&i.Status,
 		&i.CreatedAt,
 		&i.RejectionReason,
+		&i.ThumbnailName,
+		&i.QuarantineName,
 	)
 	return i, err
 }
 
 const listAttachmentsForMessage = `-- name: ListAttachmentsForMessage :many
-SELECT id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason FROM attachments WHERE message_id = $1 ORDER BY created_at, id
+SELECT id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason, thumbnail_name, quarantine_name FROM attachments WHERE message_id = $1 ORDER BY created_at, id
 `
 
 func (q *Queries) ListAttachmentsForMessage(ctx context.Context, messageID pgtype.UUID) ([]Attachment, error) {
@@ -130,6 +169,8 @@ func (q *Queries) ListAttachmentsForMessage(ctx context.Context, messageID pgtyp
 			&i.Status,
 			&i.CreatedAt,
 			&i.RejectionReason,
+			&i.ThumbnailName,
+			&i.QuarantineName,
 		); err != nil {
 			return nil, err
 		}
@@ -174,7 +215,7 @@ func (q *Queries) RejectAttachment(ctx context.Context, arg RejectAttachmentPara
 const updateAttachment = `-- name: UpdateAttachment :one
 UPDATE attachments SET mime_type = $2, size_bytes = $3, width = $4,
     height = $5, duration_sec = $6, blurhash = $7, status = $8
-WHERE id = $1 RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason
+WHERE id = $1 RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason, thumbnail_name, quarantine_name
 `
 
 type UpdateAttachmentParams struct {
@@ -215,6 +256,8 @@ func (q *Queries) UpdateAttachment(ctx context.Context, arg UpdateAttachmentPara
 		&i.Status,
 		&i.CreatedAt,
 		&i.RejectionReason,
+		&i.ThumbnailName,
+		&i.QuarantineName,
 	)
 	return i, err
 }

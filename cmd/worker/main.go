@@ -53,6 +53,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer disk.Close()
+	images, closeImages, err := worker.NewImageProcessor()
+	if err != nil {
+		return err
+	}
+	defer closeImages()
 	address := cfg.ClamdAddr
 	if address == "" {
 		address = "localhost:3310"
@@ -70,7 +75,7 @@ func run(logger *slog.Logger) error {
 		}),
 	})
 	mux := asynq.NewServeMux()
-	mux.Handle(worker.ProcessAttachment, worker.NewAttachmentHandler(database, disk, scanner, logger))
+	mux.Handle(worker.ProcessAttachment, worker.NewAttachmentHandler(database, disk, scanner, logger, images))
 	if err := server.Start(mux); err != nil {
 		return fmt.Errorf("start worker: %w", err)
 	}

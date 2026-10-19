@@ -23,6 +23,8 @@ type Attachment struct {
 	Status          string
 	CreatedAt       pgtype.Timestamptz
 	RejectionReason pgtype.Text
+	ThumbnailName   pgtype.Text
+	QuarantineName  pgtype.Text
 }
 
 type Message struct {
