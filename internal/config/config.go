@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	ClamdAddr       string
 	StorageDir      string
 	RedisURL        string
 	WSOrigin        string
@@ -25,6 +26,7 @@ func Load() (Config, error) {
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	cfg.WSOrigin = os.Getenv("WS_ORIGIN")
 	cfg.RedisURL = os.Getenv("REDIS_URL")
+	cfg.ClamdAddr = os.Getenv("CLAMD_ADDR")
 	if value := os.Getenv("HTTP_ADDR"); value != "" {
 		cfg.HTTPAddr = value
 	}

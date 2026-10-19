@@ -46,6 +46,7 @@ type Querier interface {
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockDirectRoomPair(ctx context.Context, pairKey string) error
 	MarkAttachmentReady(ctx context.Context, id pgtype.UUID) (int64, error)
+	RejectAttachment(ctx context.Context, arg RejectAttachmentParams) (int64, error)
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) (int64, error)
 	RotateRefreshToken(ctx context.Context, arg RotateRefreshTokenParams) (pgtype.UUID, error)
 	UpdateAttachment(ctx context.Context, arg UpdateAttachmentParams) (Attachment, error)

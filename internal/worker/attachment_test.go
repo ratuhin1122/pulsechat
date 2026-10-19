@@ -15,8 +15,9 @@ import (
 )
 
 type testRepository struct {
-	get  func(context.Context, pgtype.UUID) (db.Attachment, error)
-	mark func(context.Context, pgtype.UUID) (int64, error)
+	get    func(context.Context, pgtype.UUID) (db.Attachment, error)
+	mark   func(context.Context, pgtype.UUID) (int64, error)
+	reject func(context.Context, db.RejectAttachmentParams) (int64, error)
 }
 
 func (r *testRepository) GetAttachment(ctx context.Context, id pgtype.UUID) (db.Attachment, error) {
@@ -24,6 +25,10 @@ func (r *testRepository) GetAttachment(ctx context.Context, id pgtype.UUID) (db.
 }
 func (r *testRepository) MarkAttachmentReady(ctx context.Context, id pgtype.UUID) (int64, error) {
 	return r.mark(ctx, id)
+}
+
+func (r *testRepository) RejectAttachment(ctx context.Context, p db.RejectAttachmentParams) (int64, error) {
+	return r.reject(ctx, p)
 }
 
 func TestProcessAttachment(t *testing.T) {
@@ -73,7 +78,7 @@ func TestProcessAttachment(t *testing.T) {
 			if tt.payload != "" {
 				task = asynq.NewTask(ProcessAttachment, []byte(tt.payload))
 			}
-			handler := NewAttachmentHandler(repo, slog.New(slog.NewTextHandler(io.Discard, nil)))
+			handler := NewAttachmentHandler(repo, &fakeStorage{}, &fakeScanner{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 			err = handler.ProcessTask(ctx, task)
 			if (err != nil) != tt.wantErr || errors.Is(err, asynq.SkipRetry) != tt.skip {
 				t.Fatalf("error = %v, wantErr = %v, skip = %v", err, tt.wantErr, tt.skip)

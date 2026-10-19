@@ -26,6 +26,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("WS_ORIGIN", "")
 			t.Setenv("REDIS_URL", "")
 			t.Setenv("STORAGE_DIR", "")
+			t.Setenv("CLAMD_ADDR", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()

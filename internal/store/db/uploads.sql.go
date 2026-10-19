@@ -27,7 +27,7 @@ INSERT INTO attachments (
 SELECT id, $1::text, $2, $3,
     $4, $5, $6, $7, 'pending'
 FROM media_message
-RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at
+RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason
 `
 
 type CreatePendingUploadParams struct {
@@ -69,6 +69,7 @@ func (q *Queries) CreatePendingUpload(ctx context.Context, arg CreatePendingUplo
 		&i.Blurhash,
 		&i.Status,
 		&i.CreatedAt,
+		&i.RejectionReason,
 	)
 	return i, err
 }

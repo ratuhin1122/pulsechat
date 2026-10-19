@@ -12,6 +12,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	"pulsechat/internal/config"
+	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
 	"pulsechat/internal/worker"
 )
@@ -47,6 +48,19 @@ func run(logger *slog.Logger) error {
 	}
 	defer database.Close()
 	cancel()
+	disk, err := storage.NewLocal(cfg.StorageDir)
+	if err != nil {
+		return err
+	}
+	defer disk.Close()
+	address := cfg.ClamdAddr
+	if address == "" {
+		address = "localhost:3310"
+	}
+	scanner, err := worker.NewClamdScanner(address, 90*time.Second)
+	if err != nil {
+		return err
+	}
 	server := asynq.NewServerFromRedisClient(redis, asynq.Config{
 		Concurrency:     4,
 		ShutdownTimeout: cfg.ShutdownTimeout,
@@ -56,7 +70,7 @@ func run(logger *slog.Logger) error {
 		}),
 	})
 	mux := asynq.NewServeMux()
-	mux.Handle(worker.ProcessAttachment, worker.NewAttachmentHandler(database, logger))
+	mux.Handle(worker.ProcessAttachment, worker.NewAttachmentHandler(database, disk, scanner, logger))
 	if err := server.Start(mux); err != nil {
 		return fmt.Errorf("start worker: %w", err)
 	}

@@ -92,7 +92,7 @@ func TestWorkerConsumesAttachment(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	server := asynq.NewServerFromRedisClient(queue.redis, asynq.Config{Concurrency: 1, TaskCheckInterval: 10 * time.Millisecond, ShutdownTimeout: time.Second, Logger: Logger{Log: logger}})
 	mux := asynq.NewServeMux()
-	mux.Handle(ProcessAttachment, NewAttachmentHandler(repo, logger))
+	mux.Handle(ProcessAttachment, NewAttachmentHandler(repo, &fakeStorage{}, &fakeScanner{}, logger))
 	if err := server.Start(mux); err != nil {
 		t.Fatal(err)
 	}

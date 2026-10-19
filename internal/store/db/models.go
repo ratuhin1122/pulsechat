@@ -9,19 +9,20 @@ import (
 )
 
 type Attachment struct {
-	ID           pgtype.UUID
-	MessageID    pgtype.UUID
-	Kind         string
-	OriginalName string
-	StoredName   string
-	MimeType     string
-	SizeBytes    int64
-	Width        pgtype.Int4
-	Height       pgtype.Int4
-	DurationSec  pgtype.Float8
-	Blurhash     pgtype.Text
-	Status       string
-	CreatedAt    pgtype.Timestamptz
+	ID              pgtype.UUID
+	MessageID       pgtype.UUID
+	Kind            string
+	OriginalName    string
+	StoredName      string
+	MimeType        string
+	SizeBytes       int64
+	Width           pgtype.Int4
+	Height          pgtype.Int4
+	DurationSec     pgtype.Float8
+	Blurhash        pgtype.Text
+	Status          string
+	CreatedAt       pgtype.Timestamptz
+	RejectionReason pgtype.Text
 }
 
 type Message struct {

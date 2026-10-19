@@ -19,4 +19,8 @@ WHERE id = $1 RETURNING *;
 DELETE FROM attachments WHERE id = $1;
 
 -- name: MarkAttachmentReady :execrows
-UPDATE attachments SET status = 'ready' WHERE id = $1 AND status = 'pending';
+UPDATE attachments SET status = 'ready', rejection_reason = NULL WHERE id = $1 AND status = 'pending';
+
+-- name: RejectAttachment :execrows
+UPDATE attachments SET status = 'rejected', rejection_reason = sqlc.arg(reason)::text
+WHERE id = sqlc.arg(id) AND status <> 'rejected';
