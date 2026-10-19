@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"pulsechat/internal/auth"
+	"pulsechat/internal/chat"
 	"pulsechat/internal/config"
 	"pulsechat/internal/store"
 )
@@ -45,6 +46,7 @@ func run(logger *slog.Logger) error {
 
 	mux := http.NewServeMux()
 	auth.New(database, tokens, logger).RegisterRoutes(mux)
+	chat.New(database, logger).RegisterRoutes(mux, tokens)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if _, err := w.Write([]byte("ok\n")); err != nil {
