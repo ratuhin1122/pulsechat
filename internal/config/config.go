@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	WSOrigin        string
 	JWTSecret       string
 	DatabaseURL     string
 	HTTPAddr        string
@@ -17,6 +18,7 @@ func Load() (Config, error) {
 	cfg := Config{HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second}
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
+	cfg.WSOrigin = os.Getenv("WS_ORIGIN")
 	if value := os.Getenv("HTTP_ADDR"); value != "" {
 		cfg.HTTPAddr = value
 	}

@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) (RoomMember, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
+	CreateMemberMessage(ctx context.Context, arg CreateMemberMessageParams) (Message, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
@@ -32,6 +33,7 @@ type Querier interface {
 	JoinGroupRoom(ctx context.Context, arg JoinGroupRoomParams) (int64, error)
 	ListAttachmentsForMessage(ctx context.Context, messageID pgtype.UUID) ([]Attachment, error)
 	ListMessages(ctx context.Context, arg ListMessagesParams) ([]Message, error)
+	ListRoomMemberIDs(ctx context.Context, roomID pgtype.UUID) ([]pgtype.UUID, error)
 	ListRoomMembers(ctx context.Context, arg ListRoomMembersParams) ([]RoomMember, error)
 	ListRoomsForUser(ctx context.Context, arg ListRoomsForUserParams) ([]Room, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)

@@ -15,6 +15,7 @@ import (
 	"pulsechat/internal/chat"
 	"pulsechat/internal/config"
 	"pulsechat/internal/store"
+	"pulsechat/internal/ws"
 )
 
 func main() {
@@ -43,10 +44,17 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer database.Close()
+	hub := ws.NewHub()
+	defer hub.Close()
+	websocketHandler, err := ws.New(ctx, database, tokens, hub, logger, cfg.WSOrigin)
+	if err != nil {
+		return err
+	}
 
 	mux := http.NewServeMux()
 	auth.New(database, tokens, logger).RegisterRoutes(mux)
 	chat.New(database, logger).RegisterRoutes(mux, tokens)
+	websocketHandler.RegisterRoutes(mux)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if _, err := w.Write([]byte("ok\n")); err != nil {
