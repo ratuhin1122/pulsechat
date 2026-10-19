@@ -33,6 +33,11 @@ type outgoingMessage struct {
 	CreatedAt time.Time   `json:"created_at"`
 }
 
+func marshalMessage(message db.Message) ([]byte, error) {
+	return json.Marshal(outgoingMessage{Type: "message", ID: message.ID, RoomID: message.RoomID,
+		SenderID: message.SenderID, Body: message.Body, CreatedAt: message.CreatedAt.Time})
+}
+
 func parseMessage(data []byte) (incomingMessage, pgtype.UUID, error) {
 	var input incomingMessage
 	var room pgtype.UUID
@@ -97,6 +102,8 @@ func (h *Handler) readLoop(ctx context.Context, conn *websocket.Conn, c *client,
 }
 
 func (h *Handler) persistAndBroadcast(ctx context.Context, room, user pgtype.UUID, body string) error {
+	h.messageMu.Lock()
+	defer h.messageMu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := chat.RequireMembership(ctx, h.repo, room, user); err != nil {
@@ -111,8 +118,7 @@ func (h *Handler) persistAndBroadcast(ctx context.Context, room, user pgtype.UUI
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(outgoingMessage{Type: "message", ID: message.ID, RoomID: message.RoomID,
-		SenderID: message.SenderID, Body: message.Body, CreatedAt: message.CreatedAt.Time})
+	data, err := marshalMessage(message)
 	if err != nil {
 		return err
 	}

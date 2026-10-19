@@ -25,6 +25,9 @@ type Repository interface {
 	CreateMemberMessage(context.Context, db.CreateMemberMessageParams) (db.Message, error)
 	ListRoomMemberIDs(context.Context, pgtype.UUID) ([]pgtype.UUID, error)
 	ListUserRoomIDs(context.Context, pgtype.UUID) ([]pgtype.UUID, error)
+	GetUserMessage(context.Context, db.GetUserMessageParams) (db.Message, error)
+	GetLatestUserMessage(context.Context, pgtype.UUID) (db.Message, error)
+	ListReplayMessages(context.Context, db.ListReplayMessagesParams) ([]db.Message, error)
 }
 
 type Handler struct {
@@ -36,6 +39,7 @@ type Handler struct {
 	origin     string
 	presence   Presence
 	presenceMu sync.Mutex
+	messageMu  sync.Mutex
 }
 
 // An empty origin permits only the request's own scheme and host. Behind a TLS
@@ -69,6 +73,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	cursor, ok := h.replayCursor(w, r, user)
+	if !ok {
+		return
+	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{origin}})
 	if err != nil {
 		return
@@ -76,8 +84,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.CloseNow()
 	conn.SetReadLimit(MaxMessageSize)
 	c := newClient(user.String(), sendBuffer)
-	if !h.hub.register(c) {
-		conn.Close(websocket.StatusGoingAway, "server shutting down")
+	plan, err := h.registerForReplay(h.ctx, c, cursor, user)
+	if err != nil {
+		h.logger.ErrorContext(h.ctx, "prepare websocket replay", "error", err)
+		conn.Close(websocket.StatusInternalError, "replay unavailable")
 		return
 	}
 	defer h.hub.unregister(c)
@@ -105,7 +115,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer loops.Done()
 		defer cancel()
-		h.writeLoop(ctx, conn, c, raw)
+		h.writeLoop(ctx, conn, c, raw, plan)
 	}()
 	<-ctx.Done()
 	conn.CloseNow()

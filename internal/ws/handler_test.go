@@ -49,6 +49,18 @@ func (s *testRepository) ListUserRoomIDs(_ context.Context, _ pgtype.UUID) ([]pg
 	return []pgtype.UUID{id}, nil
 }
 
+func (s *testRepository) GetUserMessage(context.Context, db.GetUserMessageParams) (db.Message, error) {
+	return db.Message{}, pgx.ErrNoRows
+}
+
+func (s *testRepository) GetLatestUserMessage(context.Context, pgtype.UUID) (db.Message, error) {
+	return db.Message{}, pgx.ErrNoRows
+}
+
+func (s *testRepository) ListReplayMessages(context.Context, db.ListReplayMessagesParams) ([]db.Message, error) {
+	return nil, nil
+}
+
 func newTestHandler(t *testing.T, repo Repository, origin string) (*Handler, string) {
 	t.Helper()
 	tokens, err := auth.NewTokens(strings.Repeat("a", 32))

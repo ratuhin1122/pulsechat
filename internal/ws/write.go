@@ -19,10 +19,23 @@ type socketWriter interface {
 	CloseNow() error
 }
 
-func (h *Handler) writeLoop(ctx context.Context, conn socketWriter, c *client, raw string) {
+func (h *Handler) writeLoop(ctx context.Context, conn socketWriter, c *client, raw string, plan *replayPlan) {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
+	if plan != nil {
+		if err := h.replay(ctx, conn, c, raw, plan, ticker.C); err != nil {
+			h.logger.ErrorContext(ctx, "replay messages", "error", err)
+			conn.CloseNow()
+			return
+		}
+	}
 	h.writePump(ctx, conn, c, raw, ticker.C)
+}
+
+func ping(ctx context.Context, conn socketWriter) error {
+	pingCtx, cancel := context.WithTimeout(ctx, heartbeatTimeout)
+	defer cancel()
+	return conn.Ping(pingCtx)
 }
 
 func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, raw string, ticks <-chan time.Time) {
@@ -56,9 +69,7 @@ func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, r
 				conn.Close(websocket.StatusPolicyViolation, "access token expired")
 				return
 			}
-			pingCtx, cancel := context.WithTimeout(ctx, heartbeatTimeout)
-			err := conn.Ping(pingCtx)
-			cancel()
+			err := ping(ctx, conn)
 			if err != nil {
 				conn.CloseNow()
 				return

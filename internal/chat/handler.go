@@ -24,6 +24,8 @@ type Repository interface {
 	RemoveRoomMember(context.Context, db.RemoveRoomMemberParams) (int64, error)
 	ListRoomsForUser(context.Context, db.ListRoomsForUserParams) ([]db.Room, error)
 	ListRoomMembers(context.Context, db.ListRoomMembersParams) ([]db.RoomMember, error)
+	GetRoomMessage(context.Context, db.GetRoomMessageParams) (db.Message, error)
+	ListRoomHistory(context.Context, db.ListRoomHistoryParams) ([]db.Message, error)
 }
 
 type Handler struct {
@@ -42,6 +44,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, tokens *auth.Tokens) {
 	mux.Handle("POST /rooms/dm", tokens.Middleware(http.HandlerFunc(h.direct)))
 	mux.Handle("GET /rooms", tokens.Middleware(http.HandlerFunc(h.listRooms)))
 	mux.Handle("GET /rooms/{roomID}/members", tokens.Middleware(http.HandlerFunc(h.listMembers)))
+	mux.Handle("GET /rooms/{roomID}/messages", tokens.Middleware(http.HandlerFunc(h.history)))
 }
 
 func requestUser(r *http.Request) (pgtype.UUID, error) {
