@@ -14,10 +14,12 @@ type Querier interface {
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) (RoomMember, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
+	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAttachment(ctx context.Context, id pgtype.UUID) (int64, error)
 	DeleteMessage(ctx context.Context, id pgtype.UUID) (int64, error)
+	DeleteRefreshToken(ctx context.Context, tokenHash []byte) error
 	DeleteRoom(ctx context.Context, id pgtype.UUID) (int64, error)
 	DeleteUser(ctx context.Context, id pgtype.UUID) (int64, error)
 	GetAttachment(ctx context.Context, id pgtype.UUID) (Attachment, error)
@@ -32,6 +34,7 @@ type Querier interface {
 	ListRoomsForUser(ctx context.Context, arg ListRoomsForUserParams) ([]Room, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) (int64, error)
+	RotateRefreshToken(ctx context.Context, arg RotateRefreshTokenParams) (pgtype.UUID, error)
 	UpdateAttachment(ctx context.Context, arg UpdateAttachmentParams) (Attachment, error)
 	UpdateMessage(ctx context.Context, arg UpdateMessageParams) (Message, error)
 	UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, error)

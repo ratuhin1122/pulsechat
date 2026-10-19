@@ -33,6 +33,13 @@ type Message struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type RefreshToken struct {
+	TokenHash []byte
+	UserID    pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type Room struct {
 	ID        pgtype.UUID
 	Type      string

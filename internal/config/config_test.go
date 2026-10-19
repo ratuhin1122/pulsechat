@@ -22,6 +22,7 @@ func TestLoad(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("DATABASE_URL", "")
+			t.Setenv("JWT_SECRET", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()

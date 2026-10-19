@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"pulsechat/internal/auth"
 	"pulsechat/internal/config"
 	"pulsechat/internal/store"
 )
@@ -30,6 +31,10 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	tokens, err := auth.NewTokens(cfg.JWTSecret)
+	if err != nil {
+		return err
+	}
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	database, err := store.New(connectCtx, cfg.DatabaseURL)
 	cancel()
@@ -39,6 +44,7 @@ func run(logger *slog.Logger) error {
 	defer database.Close()
 
 	mux := http.NewServeMux()
+	auth.New(database, tokens, logger).RegisterRoutes(mux)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if _, err := w.Write([]byte("ok\n")); err != nil {
