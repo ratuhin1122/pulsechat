@@ -20,18 +20,22 @@ type Repository interface {
 	MarkAttachmentReady(context.Context, pgtype.UUID) (int64, error)
 	RejectAttachment(context.Context, db.RejectAttachmentParams) (int64, error)
 	CompleteImageAttachment(context.Context, db.CompleteImageAttachmentParams) (int64, error)
+	CompleteMediaAttachment(context.Context, db.CompleteMediaAttachmentParams) (int64, error)
 }
 
 type AttachmentHandler struct {
-	repo    Repository
-	logger  *slog.Logger
-	storage storage.Storage
-	scanner Scanner
-	images  ImageProcessor
+	repo            Repository
+	logger          *slog.Logger
+	storage         storage.Storage
+	scanner         Scanner
+	images          ImageProcessor
+	voice           VoiceProbe
+	inspectArchives bool
 }
 
 func NewAttachmentHandler(repo Repository, disk storage.Storage, scanner Scanner, logger *slog.Logger, images ...ImageProcessor) *AttachmentHandler {
 	h := &AttachmentHandler{repo: repo, storage: disk, scanner: scanner, logger: logger}
+	h.voice = FFProbe{}
 	if len(images) > 0 {
 		h.images = images[0]
 	}
@@ -81,13 +85,15 @@ func (h *AttachmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 	if attachment.Kind == "image" {
 		return h.processImage(ctx, attachment)
 	}
-	updated, err := h.repo.MarkAttachmentReady(ctx, id)
-	if err != nil {
-		return fmt.Errorf("mark attachment ready: %w", err)
+	if attachment.Kind == "document" || attachment.Kind == "voice" {
+		return h.processMedia(ctx, attachment)
 	}
-	if updated == 0 {
-		return nil
+	return h.reject(ctx, attachment, "unsupported attachment kind")
+}
+
+func (h *AttachmentHandler) ConfigureMedia(probe VoiceProbe, inspectArchives bool) {
+	if probe != nil {
+		h.voice = probe
 	}
-	h.logger.InfoContext(ctx, "attachment processed", "attachment_id", id.String())
-	return nil
+	h.inspectArchives = inspectArchives
 }

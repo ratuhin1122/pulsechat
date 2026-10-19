@@ -53,7 +53,15 @@ func (s *fakeStorage) Open(_ context.Context, area storage.Area, _ string) (stor
 	if s.openErr != nil {
 		return nil, s.openErr
 	}
-	return fakeFile{Reader: bytes.NewReader([]byte("quarantined file contents")), closeErr: s.closeErr}, nil
+	return fakeFile{Reader: bytes.NewReader([]byte("%PDF-1.7\n" + strings.Repeat("x", 120))), closeErr: s.closeErr}, nil
+}
+
+func (s *fakeStorage) Save(_ context.Context, area storage.Area, source io.Reader) (storage.Object, error) {
+	if area != storage.Clean {
+		return storage.Object{}, errors.New("expected clean destination")
+	}
+	n, err := io.Copy(io.Discard, source)
+	return storage.Object{Name: "550e8400-e29b-41d4-a716-446655440001", Size: n}, err
 }
 
 func (s *fakeStorage) Delete(ctx context.Context, area storage.Area, _ string) error {
@@ -88,7 +96,7 @@ func TestAttachmentScanning(t *testing.T) {
 			ready, rejected := false, false
 			repo := &testRepository{
 				get: func(_ context.Context, id pgtype.UUID) (db.Attachment, error) {
-					return db.Attachment{ID: id, Status: "pending", StoredName: id.String()}, nil
+					return db.Attachment{ID: id, Status: "pending", StoredName: id.String(), Kind: "document", OriginalName: "sample.pdf", MimeType: "application/pdf"}, nil
 				},
 				mark: func(context.Context, pgtype.UUID) (int64, error) {
 					if scanner.calls != 1 || scanner.result.Threat != "" || scanner.err != nil {
@@ -120,10 +128,10 @@ func TestAttachmentScanning(t *testing.T) {
 			if !tt.wantReady && disk.deletes != 1 {
 				t.Error("rejected file was not deleted")
 			}
-			if tt.wantReady && disk.deletes != 0 {
-				t.Error("clean file was deleted")
+			if tt.wantReady && disk.deletes != 1 {
+				t.Error("quarantine original was not deleted after promotion")
 			}
-			if tt.openErr == nil && string(scanner.content) != "quarantined file contents" {
+			if tt.openErr == nil && string(scanner.content) != "%PDF-1.7\n"+strings.Repeat("x", 120) {
 				t.Error("scanner did not receive quarantined content")
 			}
 		})

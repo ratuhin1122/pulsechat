@@ -19,6 +19,14 @@ type testRepository struct {
 	mark     func(context.Context, pgtype.UUID) (int64, error)
 	reject   func(context.Context, db.RejectAttachmentParams) (int64, error)
 	complete func(context.Context, db.CompleteImageAttachmentParams) (int64, error)
+	media    func(context.Context, db.CompleteMediaAttachmentParams) (int64, error)
+}
+
+func (r *testRepository) CompleteMediaAttachment(ctx context.Context, p db.CompleteMediaAttachmentParams) (int64, error) {
+	if r.media != nil {
+		return r.media(ctx, p)
+	}
+	return r.mark(ctx, p.ID)
 }
 
 func (r *testRepository) CompleteImageAttachment(ctx context.Context, p db.CompleteImageAttachmentParams) (int64, error) {
@@ -63,7 +71,7 @@ func TestProcessAttachment(t *testing.T) {
 					if got != ctx || id.String() != validID {
 						t.Error("load arguments not forwarded")
 					}
-					return db.Attachment{ID: id, Status: status}, tt.getErr
+					return db.Attachment{ID: id, Status: status, Kind: "document", OriginalName: "sample.pdf", MimeType: "application/pdf"}, tt.getErr
 				},
 				mark: func(got context.Context, id pgtype.UUID) (int64, error) {
 					marked++

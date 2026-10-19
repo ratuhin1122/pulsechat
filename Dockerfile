@@ -1,5 +1,5 @@
 FROM golang:1.26-alpine3.23 AS build
-RUN apk add --no-cache build-base pkgconf vips-dev
+RUN apk add --no-cache build-base pkgconf vips-dev ffmpeg
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -10,7 +10,7 @@ RUN CGO_ENABLED=1 go build -tags libvips -trimpath -ldflags="-s -w" -o /out/work
 RUN CGO_ENABLED=1 go test -tags libvips ./internal/worker
 
 FROM alpine:3.23
-RUN apk add --no-cache ca-certificates vips && adduser -D -u 10001 app
+RUN apk add --no-cache ca-certificates vips ffmpeg && adduser -D -u 10001 app
 WORKDIR /app
 COPY --from=build /out/api /app/api
 COPY --from=build /out/worker /app/worker

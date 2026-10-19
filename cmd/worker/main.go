@@ -75,7 +75,9 @@ func run(logger *slog.Logger) error {
 		}),
 	})
 	mux := asynq.NewServeMux()
-	mux.Handle(worker.ProcessAttachment, worker.NewAttachmentHandler(database, disk, scanner, logger, images))
+	handler := worker.NewAttachmentHandler(database, disk, scanner, logger, images)
+	handler.ConfigureMedia(worker.FFProbe{}, cfg.InspectArchives)
+	mux.Handle(worker.ProcessAttachment, handler)
 	if err := server.Start(mux); err != nil {
 		return fmt.Errorf("start worker: %w", err)
 	}

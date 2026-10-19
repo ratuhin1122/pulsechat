@@ -37,6 +37,8 @@ func allowedType(name string) (fileType, error) {
 		kind, mime = "image", "image/webp"
 	case ".pdf":
 		kind, mime = "document", "application/pdf"
+	case ".zip":
+		kind, mime = "document", "application/zip"
 	case ".docx":
 		kind, mime = "document", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 	case ".xlsx":
@@ -66,6 +68,8 @@ func allowedType(name string) (fileType, error) {
 func matchesMagic(want fileType, prefix []byte) bool {
 	actual := http.DetectContentType(prefix)
 	switch want.mime {
+	case "application/zip":
+		return strings.HasPrefix(string(prefix), "PK\x03\x04") || strings.HasPrefix(string(prefix), "PK\x05\x06")
 	case "audio/ogg":
 		return strings.HasPrefix(string(prefix), "OggS\x00") && (strings.Contains(string(prefix), "OpusHead") || strings.Contains(string(prefix), "\x01vorbis"))
 	case "audio/webm":

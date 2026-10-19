@@ -27,6 +27,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("REDIS_URL", "")
 			t.Setenv("STORAGE_DIR", "")
 			t.Setenv("CLAMD_ADDR", "")
+			t.Setenv("INSPECT_ARCHIVES", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()
@@ -61,6 +62,24 @@ func TestLoadRedisURL(t *testing.T) {
 			cfg, err := Load()
 			if err != nil || cfg.RedisURL != value {
 				t.Fatalf("RedisURL = %q, error = %v", cfg.RedisURL, err)
+			}
+		})
+	}
+}
+
+func TestArchiveInspectionConfig(t *testing.T) {
+	t.Setenv("SHUTDOWN_TIMEOUT", "")
+	for _, tt := range []struct {
+		value        string
+		enabled, bad bool
+	}{
+		{value: ""}, {value: "false"}, {value: "true", enabled: true}, {value: "invalid", bad: true},
+	} {
+		t.Run(tt.value, func(t *testing.T) {
+			t.Setenv("INSPECT_ARCHIVES", tt.value)
+			cfg, err := Load()
+			if (err != nil) != tt.bad || err == nil && cfg.InspectArchives != tt.enabled {
+				t.Fatalf("config=%+v,error=%v", cfg, err)
 			}
 		})
 	}

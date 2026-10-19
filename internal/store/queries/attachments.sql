@@ -32,3 +32,10 @@ UPDATE attachments SET quarantine_name = stored_name,
     width = sqlc.arg(width)::integer, height = sqlc.arg(height)::integer,
     blurhash = sqlc.arg(blurhash)::text, status = 'ready', rejection_reason = NULL
 WHERE id = sqlc.arg(id) AND status = 'pending';
+
+-- name: CompleteMediaAttachment :execrows
+UPDATE attachments SET quarantine_name = stored_name,
+    stored_name = sqlc.arg(clean_name), size_bytes = sqlc.arg(size_bytes),
+    duration_sec = sqlc.narg(duration_sec)::double precision,
+    status = 'ready', rejection_reason = NULL
+WHERE id = sqlc.arg(id) AND status = 'pending';

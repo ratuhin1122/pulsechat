@@ -46,6 +46,34 @@ func (q *Queries) CompleteImageAttachment(ctx context.Context, arg CompleteImage
 	return result.RowsAffected(), nil
 }
 
+const completeMediaAttachment = `-- name: CompleteMediaAttachment :execrows
+UPDATE attachments SET quarantine_name = stored_name,
+    stored_name = $1, size_bytes = $2,
+    duration_sec = $3::double precision,
+    status = 'ready', rejection_reason = NULL
+WHERE id = $4 AND status = 'pending'
+`
+
+type CompleteMediaAttachmentParams struct {
+	CleanName   string
+	SizeBytes   int64
+	DurationSec pgtype.Float8
+	ID          pgtype.UUID
+}
+
+func (q *Queries) CompleteMediaAttachment(ctx context.Context, arg CompleteMediaAttachmentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeMediaAttachment,
+		arg.CleanName,
+		arg.SizeBytes,
+		arg.DurationSec,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createAttachment = `-- name: CreateAttachment :one
 INSERT INTO attachments (
     message_id, kind, original_name, stored_name, mime_type, size_bytes,

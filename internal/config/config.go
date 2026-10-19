@@ -3,10 +3,12 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
 type Config struct {
+	InspectArchives bool
 	ClamdAddr       string
 	StorageDir      string
 	RedisURL        string
@@ -27,6 +29,13 @@ func Load() (Config, error) {
 	cfg.WSOrigin = os.Getenv("WS_ORIGIN")
 	cfg.RedisURL = os.Getenv("REDIS_URL")
 	cfg.ClamdAddr = os.Getenv("CLAMD_ADDR")
+	if value := os.Getenv("INSPECT_ARCHIVES"); value != "" {
+		enabled, err := strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("parse INSPECT_ARCHIVES: %w", err)
+		}
+		cfg.InspectArchives = enabled
+	}
 	if value := os.Getenv("HTTP_ADDR"); value != "" {
 		cfg.HTTPAddr = value
 	}

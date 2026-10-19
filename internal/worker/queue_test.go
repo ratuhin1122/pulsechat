@@ -78,7 +78,7 @@ func TestWorkerConsumesAttachment(t *testing.T) {
 	processed := make(chan pgtype.UUID, 1)
 	repo := &testRepository{
 		get: func(_ context.Context, id pgtype.UUID) (db.Attachment, error) {
-			return db.Attachment{ID: id, Status: "pending"}, nil
+			return db.Attachment{ID: id, Status: "pending", Kind: "document", OriginalName: "sample.pdf", MimeType: "application/pdf"}, nil
 		},
 		mark: func(ctx context.Context, id pgtype.UUID) (int64, error) {
 			deadline, ok := ctx.Deadline()

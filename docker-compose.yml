@@ -29,6 +29,7 @@ services:
       STORAGE_DIR: "/app/data"
       SHUTDOWN_TIMEOUT: "10s"
       CLAMD_ADDR: "clamav:3310"
+      INSPECT_ARCHIVES: "${INSPECT_ARCHIVES:-false}"
     volumes:
       - uploads_data:/app/data
     stop_grace_period: 15s
