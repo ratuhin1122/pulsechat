@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { afterEach, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -8,8 +8,10 @@ import { AuthProvider } from './auth/AuthProvider';
 import { Session } from './auth/session';
 import { ApiClient } from './api/client';
 import { HttpClient } from './api/http';
+import { TestSocket } from './chat/testSocket';
 
-afterEach(cleanup);
+beforeEach(() => { TestSocket.instances = []; vi.stubGlobal('WebSocket', TestSocket); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 function setup(handler: typeof fetch, path = '/login') {
   const fetcher = vi.fn(handler);
@@ -38,6 +40,7 @@ it('signs in, lists and filters rooms, selects a room, and signs out', async () 
     }
     if (path === '/auth/logout') return new Response(null, { status: 204 });
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer memory-token');
+    if (String(path).includes('/messages?') || String(path).startsWith('/presence?')) return Response.json([]);
     return Response.json(rooms);
   });
   await screen.findByRole('heading', { name: 'Welcome back.' });

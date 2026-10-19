@@ -1,0 +1,46 @@
+.conversation-panel { height: 100svh; min-height: 0; }
+.chat-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.chat-toolbar { min-height: 43px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 32px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.connection-status::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #a5814c; }
+.status-connected::before { background: #39815a; }
+.status-offline::before { background: #7c817c; }
+.room-presence { position: relative; }
+.room-presence summary { cursor: pointer; padding: 4px; }
+.room-presence ul { position: absolute; right: 0; top: 20px; z-index: 3; list-style: none; margin: 8px 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 24px #25362f12; background: #fff; min-width: 180px; max-height: 220px; overflow-y: auto; }
+.room-presence li { display: flex; align-items: center; gap: 9px; padding: 7px 3px; }
+.presence-dot { display: inline-block; width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #879287; }
+.presence-dot.is-online { background: #338158; }
+.presence-dot.is-unknown { background: transparent; border: 1px solid #879287; }
+.message-viewport { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: 12px 32px 24px; overscroll-behavior: contain; }
+.message-viewport:focus-visible { outline: 2px solid #82a37c; outline-offset: -2px; }
+.history-control { min-height: 36px; text-align: center; font-size: 11px; color: var(--muted); margin-bottom: 12px; line-height: 1.6; }
+.history-control [role='alert'] { color: #9a2b2b; }
+.chat-message { display: flex; gap: 12px; margin: 18px 0; }
+.message-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 11px; background: #eaf0e5; color: #536e4a; font-size: 11px; font-weight: 600; }
+.message-content { min-width: 0; max-width: 760px; }
+.message-content header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 2px 0 6px; }
+.message-author { font-size: 12px; font-weight: 650; }
+.message-content time { color: var(--muted); font-size: 10px; margin-left: 4px; }
+.message-body { font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.attachment-summary { font-size: 13px; color: var(--accent); background: #f2f5ee; border-radius: 8px; margin-top: 7px; padding: 10px 13px; overflow-wrap: anywhere; }
+.empty-messages { text-align: center; padding: 70px 16px; }
+.empty-messages h2 { font-size: 22px; font-weight: 550; letter-spacing: -.6px; }
+.empty-messages p { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.8; }
+.composer { border-top: 1px solid var(--line); padding: 18px 28px 12px; background: #fff; }
+.composer-input { display: flex; align-items: flex-end; gap: 12px; padding: 10px 12px; border: 1px solid #dbe3d7; background: #fbfcf9; border-radius: 12px; }
+.composer-input:focus-within { border-color: #82a37c; box-shadow: 0 0 0 2px #82a37c14; }
+.composer textarea { width: 100%; min-width: 0; resize: vertical; min-height: 48px; max-height: 180px; border: 0; background: transparent; padding: 6px; color: #25362f; font-size: 16px; line-height: 1.5; }
+.composer textarea:focus-visible { outline: none; }
+.composer textarea[aria-invalid='true'] { color: #9a2b2b; }
+.send-button { width: 38px; min-height: 38px; padding: 8px; flex-shrink: 0; border-radius: 9px; margin-bottom: 3px; }
+.composer-hint { color: var(--muted); font-size: 10px; line-height: 1.6; margin: 8px 3px 0; }
+.composer .error-message { margin-top: 10px; }
+@media (max-width: 760px) {
+  .conversation-panel { height: calc(100svh - 73px); min-height: 0; }
+  .chat-toolbar { padding: 8px 20px; }
+  .message-viewport { padding: 8px 18px 16px; }
+  .composer { padding: 12px 16px max(12px, env(safe-area-inset-bottom)); }
+  .chat-message { gap: 9px; }
+  .message-avatar { width: 28px; height: 28px; border-radius: 9px; }
+  .message-content time { font-size: 9px; }
+}

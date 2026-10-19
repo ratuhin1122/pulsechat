@@ -3,8 +3,13 @@ import type { Room } from '../api/types';
 import { Brand } from '../components/Brand';
 import { Icon } from '../components/Icon';
 import { roomName, Sidebar } from '../rooms/Sidebar';
+import { useAuth } from '../auth/AuthProvider';
+import { useChatSocket } from '../chat/useChatSocket';
+import { ChatView } from '../chat/ChatView';
 
 export function Workspace() {
+  const { session } = useAuth();
+  const realtime = useChatSocket(session);
   const [selected, setSelected] = useState<Room | null>(null);
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -27,12 +32,12 @@ export function Workspace() {
         </div>
         {selected && <span className="room-label">{selected.type === 'dm' ? 'DIRECT' : 'GROUP'}</span>}
       </header>
-      <div className="conversation-empty"><div className="welcome-mark" aria-hidden="true"><Icon name="message" /><span /></div>
+      {selected ? <ChatView key={selected.id} roomID={selected.id} realtime={realtime} /> : <div className="conversation-empty"><div className="welcome-mark" aria-hidden="true"><Icon name="message" /><span /></div>
         <span className="eyebrow">ROOM FOR CONNECTION</span>
         <h2>{selected ? `You're in ${roomName(selected)}.` : 'Your people. One place.'}</h2>
         <p>{selected ? 'Make space for a good conversation.' : 'Choose a room from the sidebar to make yourself at home.'}</p>
         <div className="welcome-line" aria-hidden="true" />
-      </div>
+      </div>}
     </main>
   </div>;
 }
