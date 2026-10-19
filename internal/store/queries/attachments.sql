@@ -17,3 +17,6 @@ WHERE id = $1 RETURNING *;
 
 -- name: DeleteAttachment :execrows
 DELETE FROM attachments WHERE id = $1;
+
+-- name: MarkAttachmentReady :execrows
+UPDATE attachments SET status = 'ready' WHERE id = $1 AND status = 'pending';

@@ -24,15 +24,20 @@ type Repository interface {
 	CreatePendingUpload(context.Context, db.CreatePendingUploadParams) (db.Attachment, error)
 }
 
+type Enqueuer interface {
+	EnqueueAttachment(context.Context, string) error
+}
+
 type Handler struct {
 	repo    Repository
 	storage storage.Storage
 	limiter RateLimiter
 	logger  *slog.Logger
+	queue   Enqueuer
 }
 
-func New(repo Repository, disk storage.Storage, limiter RateLimiter, logger *slog.Logger) *Handler {
-	return &Handler{repo: repo, storage: disk, limiter: limiter, logger: logger}
+func New(repo Repository, disk storage.Storage, limiter RateLimiter, queue Enqueuer, logger *slog.Logger) *Handler {
+	return &Handler{repo: repo, storage: disk, limiter: limiter, queue: queue, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, tokens *auth.Tokens) {
@@ -95,6 +100,17 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	committed = true
+	// Once the row exists, preserve its file even if Redis is unavailable. Queueing
+	// has its own bounded context so a disconnected client cannot cancel the job.
+	enqueueCtx, enqueueCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+	err = h.queue.EnqueueAttachment(enqueueCtx, attachment.ID.String())
+	enqueueCancel()
+	if err != nil {
+		h.logger.ErrorContext(r.Context(), "enqueue attachment failed", "attachment_id", attachment.ID.String(), "error", err)
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, "upload saved but processing queue unavailable", http.StatusServiceUnavailable)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusAccepted)

@@ -138,6 +138,18 @@ func (q *Queries) ListAttachmentsForMessage(ctx context.Context, messageID pgtyp
 	return items, nil
 }
 
+const markAttachmentReady = `-- name: MarkAttachmentReady :execrows
+UPDATE attachments SET status = 'ready' WHERE id = $1 AND status = 'pending'
+`
+
+func (q *Queries) MarkAttachmentReady(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markAttachmentReady, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateAttachment = `-- name: UpdateAttachment :one
 UPDATE attachments SET mime_type = $2, size_bytes = $3, width = $4,
     height = $5, duration_sec = $6, blurhash = $7, status = $8

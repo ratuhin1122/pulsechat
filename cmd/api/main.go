@@ -17,6 +17,7 @@ import (
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
 	"pulsechat/internal/upload"
+	"pulsechat/internal/worker"
 )
 
 func main() {
@@ -55,6 +56,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer disk.Close()
+	attachmentQueue, err := worker.NewQueue(cfg.RedisURL)
+	if err != nil {
+		return err
+	}
+	defer attachmentQueue.Close()
 	uploadLimiter, err := upload.NewMemoryLimiter(10, time.Minute)
 	if err != nil {
 		return err
@@ -64,7 +70,7 @@ func run(logger *slog.Logger) error {
 	auth.New(database, tokens, logger).RegisterRoutes(mux)
 	chat.New(database, logger).RegisterRoutes(mux, tokens)
 	websocketHandler.RegisterRoutes(mux)
-	upload.New(database, disk, uploadLimiter, logger).RegisterRoutes(mux, tokens)
+	upload.New(database, disk, uploadLimiter, attachmentQueue, logger).RegisterRoutes(mux, tokens)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if _, err := w.Write([]byte("ok\n")); err != nil {

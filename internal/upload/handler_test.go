@@ -63,6 +63,9 @@ func TestUploads(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tt.status != 202 {
+				if len(repo.enqueued) != 0 {
+					t.Error("invalid upload was enqueued")
+				}
 				if len(files) != 0 {
 					t.Error("rejected upload left files behind")
 				}
@@ -75,6 +78,9 @@ func TestUploads(t *testing.T) {
 				t.Fatalf("files = %d, inserts = %d", len(files), len(repo.inserted))
 			}
 			p := repo.inserted[0]
+			if len(repo.enqueued) != 1 || repo.enqueued[0] != p.RoomID.String() {
+				t.Error("attachment ID was not enqueued")
+			}
 			var storedID pgtype.UUID
 			if storedID.Scan(p.StoredName) != nil || p.StoredName == tt.filename || p.StoredName != files[0].Name() {
 				t.Error("stored name is not a random UUID")

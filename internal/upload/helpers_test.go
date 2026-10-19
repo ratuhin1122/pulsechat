@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"image"
 	"image/color/palette"
 	"image/gif"
@@ -28,6 +29,16 @@ import (
 type testRepository struct {
 	memberErr, insertErr error
 	inserted             []db.CreatePendingUploadParams
+	enqueued             []string
+	queueErr             error
+}
+
+func (s *testRepository) EnqueueAttachment(_ context.Context, id string) error {
+	if len(s.inserted) == 0 {
+		return fmt.Errorf("enqueued before attachment insert")
+	}
+	s.enqueued = append(s.enqueued, id)
+	return s.queueErr
 }
 
 func (s *testRepository) GetRoomMember(_ context.Context, p db.GetRoomMemberParams) (db.RoomMember, error) {
@@ -59,7 +70,7 @@ func testHandler(t *testing.T, repo *testRepository, limit int) (*http.ServeMux,
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	New(repo, disk, limiter, slog.New(slog.NewTextHandler(io.Discard, nil))).RegisterRoutes(mux, tokens)
+	New(repo, disk, limiter, repo, slog.New(slog.NewTextHandler(io.Discard, nil))).RegisterRoutes(mux, tokens)
 	return mux, token, dir
 }
 
