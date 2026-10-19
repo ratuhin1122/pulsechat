@@ -36,6 +36,7 @@ type Querier interface {
 	ListRoomMemberIDs(ctx context.Context, roomID pgtype.UUID) ([]pgtype.UUID, error)
 	ListRoomMembers(ctx context.Context, arg ListRoomMembersParams) ([]RoomMember, error)
 	ListRoomsForUser(ctx context.Context, arg ListRoomsForUserParams) ([]Room, error)
+	ListUserRoomIDs(ctx context.Context, userID pgtype.UUID) ([]pgtype.UUID, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockDirectRoomPair(ctx context.Context, pairKey string) error
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) (int64, error)

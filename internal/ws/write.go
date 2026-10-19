@@ -7,9 +7,25 @@ import (
 	"github.com/coder/websocket"
 )
 
-func (h *Handler) writeLoop(ctx context.Context, conn *websocket.Conn, c *client, raw string) {
-	ticker := time.NewTicker(30 * time.Second)
+const (
+	heartbeatInterval = 25 * time.Second
+	heartbeatTimeout  = 10 * time.Second
+)
+
+type socketWriter interface {
+	Write(context.Context, websocket.MessageType, []byte) error
+	Ping(context.Context) error
+	Close(websocket.StatusCode, string) error
+	CloseNow() error
+}
+
+func (h *Handler) writeLoop(ctx context.Context, conn socketWriter, c *client, raw string) {
+	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
+	h.writePump(ctx, conn, c, raw, ticker.C)
+}
+
+func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, raw string, ticks <-chan time.Time) {
 	for {
 		// Prioritize eviction over any messages still buffered for this client.
 		select {
@@ -35,15 +51,16 @@ func (h *Handler) writeLoop(ctx context.Context, conn *websocket.Conn, c *client
 			if err != nil {
 				return
 			}
-		case <-ticker.C:
+		case <-ticks:
 			if _, err := h.tokens.Validate(raw); err != nil {
 				conn.Close(websocket.StatusPolicyViolation, "access token expired")
 				return
 			}
-			pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			pingCtx, cancel := context.WithTimeout(ctx, heartbeatTimeout)
 			err := conn.Ping(pingCtx)
 			cancel()
 			if err != nil {
+				conn.CloseNow()
 				return
 			}
 		}

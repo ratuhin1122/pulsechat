@@ -48,6 +48,43 @@ func (h *Hub) unregister(c *client) {
 	h.remove(c, websocket.StatusNormalClosure, "connection closed")
 }
 
+func (h *Hub) send(c *client, payload []byte) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.enqueue(c, bytes.Clone(payload))
+}
+
+// enqueue must be called with mu held.
+func (h *Hub) enqueue(c *client, payload []byte) bool {
+	if _, ok := h.clients[c]; !ok {
+		return false
+	}
+	select {
+	case c.send <- payload:
+		return true
+	default:
+		h.remove(c, websocket.StatusPolicyViolation, "slow consumer")
+		return false
+	}
+}
+
+// BroadcastToUsers delivers one event per connection, independent of how many
+// rooms the users share. Callers supply an authorized audience.
+func (h *Hub) BroadcastToUsers(userIDs []string, payload []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	allowed := make(map[string]struct{}, len(userIDs))
+	for _, id := range userIDs {
+		allowed[id] = struct{}{}
+	}
+	data := bytes.Clone(payload)
+	for c := range h.clients {
+		if _, ok := allowed[c.userID]; ok {
+			h.enqueue(c, data)
+		}
+	}
+}
+
 // remove must be called with mu held. Only the hub closes done; send stays open.
 func (h *Hub) remove(c *client, code websocket.StatusCode, reason string) {
 	if _, ok := h.clients[c]; !ok {
@@ -89,11 +126,7 @@ func (h *Hub) Broadcast(roomID string, memberIDs []string, payload []byte) {
 	h.rooms[roomID] = audience
 	data := bytes.Clone(payload)
 	for c := range audience {
-		select {
-		case c.send <- data:
-		default:
-			h.remove(c, websocket.StatusPolicyViolation, "slow consumer")
-		}
+		h.enqueue(c, data)
 	}
 }
 

@@ -24,28 +24,32 @@ type Repository interface {
 	chat.MembershipReader
 	CreateMemberMessage(context.Context, db.CreateMemberMessageParams) (db.Message, error)
 	ListRoomMemberIDs(context.Context, pgtype.UUID) ([]pgtype.UUID, error)
+	ListUserRoomIDs(context.Context, pgtype.UUID) ([]pgtype.UUID, error)
 }
 
 type Handler struct {
-	ctx    context.Context
-	repo   Repository
-	tokens *auth.Tokens
-	hub    *Hub
-	logger *slog.Logger
-	origin string
+	ctx        context.Context
+	repo       Repository
+	tokens     *auth.Tokens
+	hub        *Hub
+	logger     *slog.Logger
+	origin     string
+	presence   Presence
+	presenceMu sync.Mutex
 }
 
 // An empty origin permits only the request's own scheme and host. Behind a TLS
 // terminating proxy, configure the exact public origin explicitly.
-func New(ctx context.Context, repo Repository, tokens *auth.Tokens, hub *Hub, logger *slog.Logger, origin string) (*Handler, error) {
+func New(ctx context.Context, repo Repository, tokens *auth.Tokens, hub *Hub, presence Presence, logger *slog.Logger, origin string) (*Handler, error) {
 	if err := validateOrigin(origin); err != nil {
 		return nil, err
 	}
-	return &Handler{ctx: ctx, repo: repo, tokens: tokens, hub: hub, logger: logger, origin: origin}, nil
+	return &Handler{ctx: ctx, repo: repo, tokens: tokens, hub: hub, presence: presence, logger: logger, origin: origin}, nil
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /ws", h)
+	mux.Handle("GET /presence", h.tokens.Middleware(http.HandlerFunc(h.listPresence)))
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +81,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer h.hub.unregister(c)
+	if err := h.changePresence(h.ctx, c.userID, true); err != nil {
+		h.logger.ErrorContext(h.ctx, "connect presence", "error", err)
+		conn.Close(websocket.StatusInternalError, "presence unavailable")
+		return
+	}
+	defer func() {
+		// changePresence starts its timeout after acquiring the transition lock.
+		cleanupCtx := context.WithoutCancel(h.ctx)
+		if err := h.changePresence(cleanupCtx, c.userID, false); err != nil {
+			h.logger.ErrorContext(cleanupCtx, "disconnect presence", "error", err)
+		}
+	}()
 	ctx, cancel := context.WithCancel(h.ctx)
 	defer cancel()
 	var loops sync.WaitGroup

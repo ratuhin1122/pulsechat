@@ -44,7 +44,13 @@ func parseMessage(data []byte) (incomingMessage, pgtype.UUID, error) {
 	if err := d.Decode(new(any)); !errors.Is(err, io.EOF) {
 		return input, room, errors.New("expected one JSON object")
 	}
-	if input.Type != "message" || strings.TrimSpace(input.Body) == "" || len(input.Body) > MaxBodySize || !utf8.Valid(data) {
+	if !utf8.Valid(data) {
+		return input, room, errors.New("invalid UTF-8")
+	}
+	if input.Type == "ping" && input.RoomID == "" && input.Body == "" {
+		return input, room, nil
+	}
+	if input.Type != "message" || strings.TrimSpace(input.Body) == "" || len(input.Body) > MaxBodySize {
 		return input, room, errors.New("invalid message")
 	}
 	if err := room.Scan(input.RoomID); err != nil || !room.Valid {
@@ -71,6 +77,12 @@ func (h *Handler) readLoop(ctx context.Context, conn *websocket.Conn, c *client,
 		if kind != websocket.MessageText || err != nil {
 			conn.Close(websocket.StatusPolicyViolation, "invalid message")
 			return
+		}
+		if input.Type == "ping" {
+			if !h.hub.send(c, []byte(`{"type":"pong"}`)) {
+				return
+			}
+			continue
 		}
 		if err := h.persistAndBroadcast(ctx, room, user, input.Body); err != nil {
 			if errors.Is(err, chat.ErrNotMember) || errors.Is(err, pgx.ErrNoRows) {

@@ -41,6 +41,14 @@ func (s *testRepository) ListRoomMemberIDs(_ context.Context, _ pgtype.UUID) ([]
 	return []pgtype.UUID{id}, nil
 }
 
+func (s *testRepository) ListUserRoomIDs(_ context.Context, _ pgtype.UUID) ([]pgtype.UUID, error) {
+	var id pgtype.UUID
+	if err := id.Scan("550e8400-e29b-41d4-a716-446655440001"); err != nil {
+		return nil, err
+	}
+	return []pgtype.UUID{id}, nil
+}
+
 func newTestHandler(t *testing.T, repo Repository, origin string) (*Handler, string) {
 	t.Helper()
 	tokens, err := auth.NewTokens(strings.Repeat("a", 32))
@@ -54,7 +62,7 @@ func newTestHandler(t *testing.T, repo Repository, origin string) (*Handler, str
 	ctx, cancel := context.WithCancel(context.Background())
 	hub := NewHub()
 	t.Cleanup(func() { cancel(); hub.Close() })
-	h, err := New(ctx, repo, tokens, hub, slog.New(slog.NewTextHandler(io.Discard, nil)), origin)
+	h, err := New(ctx, repo, tokens, hub, NewMemoryPresence(), slog.New(slog.NewTextHandler(io.Discard, nil)), origin)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -46,7 +46,7 @@ func run(logger *slog.Logger) error {
 	defer database.Close()
 	hub := ws.NewHub()
 	defer hub.Close()
-	websocketHandler, err := ws.New(ctx, database, tokens, hub, logger, cfg.WSOrigin)
+	websocketHandler, err := ws.New(ctx, database, tokens, hub, ws.NewMemoryPresence(), logger, cfg.WSOrigin)
 	if err != nil {
 		return err
 	}
