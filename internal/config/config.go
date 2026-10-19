@@ -7,12 +7,14 @@ import (
 )
 
 type Config struct {
+	DatabaseURL     string
 	HTTPAddr        string
 	ShutdownTimeout time.Duration
 }
 
 func Load() (Config, error) {
 	cfg := Config{HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second}
+	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	if value := os.Getenv("HTTP_ADDR"); value != "" {
 		cfg.HTTPAddr = value
 	}

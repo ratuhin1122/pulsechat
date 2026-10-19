@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"pulsechat/internal/config"
+	"pulsechat/internal/store"
 )
 
 func main() {
@@ -29,6 +30,13 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	database, err := store.New(connectCtx, cfg.DatabaseURL)
+	cancel()
+	if err != nil {
+		return err
+	}
+	defer database.Close()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {

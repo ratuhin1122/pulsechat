@@ -21,6 +21,7 @@ func TestLoad(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()
@@ -31,5 +32,18 @@ func TestLoad(t *testing.T) {
 				t.Errorf("Load() = %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestLoadDatabaseURL(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/pulsechat")
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("SHUTDOWN_TIMEOUT", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load(): %v", err)
+	}
+	if cfg.DatabaseURL != "postgres://localhost/pulsechat" {
+		t.Errorf("DatabaseURL = %q", cfg.DatabaseURL)
 	}
 }
