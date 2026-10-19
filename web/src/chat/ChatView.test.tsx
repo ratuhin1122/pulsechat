@@ -92,3 +92,19 @@ it('retains a draft when the socket cannot accept it and supports Shift+Enter', 
   expect((await screen.findByRole('alert')).textContent).toContain('draft is still here');
   expect((draft as HTMLTextAreaElement).value).toBe('First\nsecond');
 });
+
+it('accepts dropped and pasted images and cleans up previews when leaving the chat', async () => {
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:preview') });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+  await setup(); await screen.findByText('Message 2');
+  const photo = new File(['x'.repeat(200)], 'dropped.png', { type: 'image/png' });
+  const conversation = screen.getByRole('region', { name: 'Conversation' });
+  fireEvent.drop(conversation, { dataTransfer: { files: [photo], types: ['Files'] } });
+  expect(screen.getByAltText('Preview of dropped.png')).toBeTruthy();
+  const pasted = new File(['x'.repeat(200)], 'pasted.png', { type: 'image/png' });
+  fireEvent.paste(screen.getByRole('textbox', { name: 'Message' }), {
+    clipboardData: { items: [{ kind: 'file', type: 'image/png', getAsFile: () => pasted }] },
+  });
+  expect(screen.getByAltText('Preview of pasted.png')).toBeTruthy();
+  cleanup(); expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+});

@@ -4,9 +4,34 @@ import type { Room } from './types';
 import type { Session } from '../auth/session';
 import { isMessage, isPresence } from '../chat/types';
 import type { Message, Presence } from '../chat/types';
+import { uploadFile } from './upload';
 
 export class ApiClient {
   constructor(private readonly http: HttpClient, private readonly session: Session) {}
+
+  private async authorized<T>(send: (token: string) => Promise<T>, signal?: AbortSignal): Promise<T> {
+    let token = await this.session.getAccessToken();
+    signal?.throwIfAborted();
+    try { return await send(token); }
+    catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      token = await this.session.refresh(token);
+      signal?.throwIfAborted();
+      try { return await send(token); }
+      catch (retryError) {
+        if (retryError instanceof ApiError && retryError.status === 401) this.session.expire(token);
+        throw retryError;
+      }
+    }
+  }
+
+  file(id: string, variant: 'thumb' | 'display' | 'original', signal?: AbortSignal): Promise<Blob> {
+    return this.authorized((token) => this.http.blob(`/files/${encodeURIComponent(id)}?variant=${variant}`, token, signal), signal);
+  }
+
+  upload(roomID: string, file: File, progress: (percent: number) => void, signal: AbortSignal) {
+    return this.authorized((token) => uploadFile(roomID, file, token, progress, signal), signal);
+  }
 
   private async get<T>(path: string, signal?: AbortSignal): Promise<T> {
     let token = await this.session.getAccessToken();

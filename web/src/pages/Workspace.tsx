@@ -6,9 +6,11 @@ import { roomName, Sidebar } from '../rooms/Sidebar';
 import { useAuth } from '../auth/AuthProvider';
 import { useChatSocket } from '../chat/useChatSocket';
 import { ChatView } from '../chat/ChatView';
+import { useUploads } from '../chat/useUploads';
 
 export function Workspace() {
-  const { session } = useAuth();
+  const { session, api } = useAuth();
+  const uploads = useUploads(api);
   const realtime = useChatSocket(session);
   const [selected, setSelected] = useState<Room | null>(null);
   const [open, setOpen] = useState(false);
@@ -32,7 +34,7 @@ export function Workspace() {
         </div>
         {selected && <span className="room-label">{selected.type === 'dm' ? 'DIRECT' : 'GROUP'}</span>}
       </header>
-      {selected ? <ChatView key={selected.id} roomID={selected.id} realtime={realtime} /> : <div className="conversation-empty"><div className="welcome-mark" aria-hidden="true"><Icon name="message" /><span /></div>
+      {selected ? <ChatView key={selected.id} roomID={selected.id} realtime={realtime} uploads={uploads} /> : <div className="conversation-empty"><div className="welcome-mark" aria-hidden="true"><Icon name="message" /><span /></div>
         <span className="eyebrow">ROOM FOR CONNECTION</span>
         <h2>{selected ? `You're in ${roomName(selected)}.` : 'Your people. One place.'}</h2>
         <p>{selected ? 'Make space for a good conversation.' : 'Choose a room from the sidebar to make yourself at home.'}</p>

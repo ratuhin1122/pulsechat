@@ -6,6 +6,10 @@ export interface Attachment {
   original_name: string;
   mime_type: string;
   size_bytes: number;
+  width?: number;
+  height?: number;
+  duration_sec?: number;
+  blurhash?: string;
 }
 
 export interface Message {
@@ -22,6 +26,7 @@ export interface Presence { user_id: string; online: boolean }
 export interface PresenceChange { online: boolean; revision: number }
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
 export type ServerEvent = { type: 'message'; message: Message }
+  | { type: 'attachment_status'; attachment_id: string; status: 'ready' | 'rejected' }
   | { type: 'presence'; user_id: string; online: boolean } | { type: 'pong' };
 
 export function isMessage(value: unknown): value is Message {
@@ -35,7 +40,10 @@ export function isMessage(value: unknown): value is Message {
       if (!a || typeof a !== 'object') return false;
       const item = a as Record<string, unknown>;
       return ['id', 'kind', 'original_name', 'mime_type'].every((key) => typeof item[key] === 'string')
-        && typeof item.size_bytes === 'number';
+        && typeof item.size_bytes === 'number' && Number.isFinite(item.size_bytes) && item.size_bytes >= 0
+        && ['width', 'height', 'duration_sec'].every((key) => item[key] === undefined
+          || typeof item[key] === 'number' && Number.isFinite(item[key]) && item[key] >= 0)
+        && (item.blurhash === undefined || typeof item.blurhash === 'string' && item.blurhash.length <= 200);
     }));
 }
 
@@ -51,6 +59,10 @@ export function parseEvent(raw: unknown): ServerEvent | null {
     const value = JSON.parse(raw) as Record<string, unknown> | null;
     if (!value || typeof value !== 'object') return null;
     if (value.type === 'pong') return { type: 'pong' };
+    if (value.type === 'attachment_status' && typeof value.attachment_id === 'string' && value.attachment_id
+      && (value.status === 'ready' || value.status === 'rejected')) {
+      return { type: 'attachment_status', attachment_id: value.attachment_id, status: value.status };
+    }
     if (value.type === 'presence' && isPresence(value)) return { ...value, type: 'presence' };
     if (value.type === 'message') {
       const message = { ...value, type: value.message_type ?? 'text' };

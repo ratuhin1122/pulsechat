@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import { PresenceDot } from './PresenceDot';
 import type { Message } from './types';
+import { AttachmentBubble } from './AttachmentBubble';
 
 interface Props {
   messages: Message[]; loading: boolean; initialized: boolean; more: boolean; error: string;
@@ -64,7 +65,8 @@ export function MessageList({ messages, loading, initialized, more, error, onlin
         </time>
       </header>
       {message.body && <p className="message-body">{message.body}</p>}
-      {message.type !== 'text' && <p className="attachment-summary">{message.attachments?.map((a) => a.original_name).join(', ') || `${message.type} attachment`}</p>}
+      {message.attachments?.map((attachment) => <AttachmentBubble key={attachment.id} attachment={attachment} />)}
+      {message.type !== 'text' && !message.attachments?.length && <p className="attachment-summary">{message.type} attachment</p>}
       </div>
     </article>)}
   </div>;

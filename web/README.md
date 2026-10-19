@@ -21,7 +21,11 @@ The UI includes login/registration, room selection, timestamped messages, text c
 
 One WebSocket stays open across room switches. It sends an app-level ping every 25 seconds, reconnects with jittered exponential delays capped at 30 seconds, and resumes with the last received message ID. The initial history page can seed the cursor before the first live message. History and replay overlap are deduplicated by ID. Presence snapshots load on room entry/reconnect, with newer live transitions taking precedence. Presence becomes unknown while disconnected.
 
-Sender labels use short user IDs because the API does not expose display names. Attachment messages show their filenames; attachment playback/download controls, room creation/joining, and uploading are outside this step.
+Sender labels use short user IDs because the API does not expose display names. Attach files with the picker, drop them into the conversation, or paste an image. Review local previews before sending. Optional image compression resizes JPEG/PNG/WebP to at most 1600px and keeps the result only when smaller; GIFs retain animation. Server validation remains authoritative.
+
+Uploads show progress, then remain processing until a ready/rejected event arrives (a ready message also confirms completion). Switching rooms preserves drafts and active uploads; leaving the workspace cancels active requests and releases local blob URLs. An interrupted upload is never automatically resent. If a rejection event was missed while disconnected, its draft can remain processing because the API has no attachment-status lookup; dismiss it after checking the conversation.
+
+Images use blurhash placeholders and open a full display image in a keyboard-accessible zoom dialog. Documents download through authenticated requests; voice bubbles provide playback and duration. Files use temporary blob URLs so access tokens never appear in file URLs. Audio is fetched in full before local playback/seeking. Voice recording requires HTTPS, microphone permission, and a browser supporting MediaRecorder with WebM/Opus or Ogg/Opus. Recording stops just below five minutes; browsers that only record MP4 must use an allowed audio file instead. Room creation/joining is outside this step.
 
 ```sh
 npm test

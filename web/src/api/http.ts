@@ -13,6 +13,13 @@ export function errorMessage(error: unknown): string {
 export class HttpClient {
   constructor(private readonly fetcher: typeof fetch = (...args) => globalThis.fetch(...args)) {}
 
+  async blob(path: string, token: string, signal?: AbortSignal): Promise<Blob> {
+    const response = await this.fetcher(path, { signal, headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include', cache: 'no-store', redirect: 'error' });
+    if (!response.ok) throw new ApiError(response.status, 'Could not load this file.');
+    return response.blob();
+  }
+
   async send<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await this.fetcher(path, {
       ...init, credentials: 'include', cache: 'no-store', redirect: 'error',
