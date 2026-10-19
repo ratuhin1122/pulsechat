@@ -1,0 +1,34 @@
+import { ApiError, HttpClient } from './http';
+import { isRoom } from './types';
+import type { Room } from './types';
+import type { Session } from '../auth/session';
+
+export class ApiClient {
+  constructor(private readonly http: HttpClient, private readonly session: Session) {}
+
+  private async get<T>(path: string, signal?: AbortSignal): Promise<T> {
+    let token = await this.session.getAccessToken();
+    signal?.throwIfAborted();
+    const send = () => this.http.send<T>(path, { signal, headers: { Authorization: `Bearer ${token}` } });
+    try { return await send(); }
+    catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      token = await this.session.refresh(token);
+      signal?.throwIfAborted();
+      try { return await send(); }
+      catch (retryError) {
+        if (retryError instanceof ApiError && retryError.status === 401) this.session.expire(token);
+        throw retryError;
+      }
+    }
+  }
+
+  async listRooms(options: { limit?: number; offset?: number; signal?: AbortSignal } = {}): Promise<Room[]> {
+    const params = new URLSearchParams({ limit: String(options.limit ?? 50), offset: String(options.offset ?? 0) });
+    const response = await this.get<unknown>(`/rooms?${params}`, options.signal);
+    if (!Array.isArray(response) || !response.every(isRoom)) {
+      throw new ApiError(502, 'The server returned an invalid room list.');
+    }
+    return response;
+  }
+}

@@ -1,0 +1,18 @@
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { ApiClient } from './api/client';
+import { HttpClient } from './api/http';
+import { AuthProvider } from './auth/AuthProvider';
+import { Session } from './auth/session';
+import { App } from './App';
+import './styles/base.css';
+import './styles/auth.css';
+import './styles/workspace.css';
+
+const http = new HttpClient();
+const session = new Session(http);
+const services = { session, api: new ApiClient(http, session) };
+const root = document.getElementById('root');
+if (!root) throw new Error('Root element is missing.');
+createRoot(root).render(<StrictMode><BrowserRouter><AuthProvider services={services}><App /></AuthProvider></BrowserRouter></StrictMode>);
