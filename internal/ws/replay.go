@@ -37,23 +37,24 @@ func (h *Handler) replayCursor(w http.ResponseWriter, r *http.Request, user pgty
 	return &cursor, true
 }
 
-// Capture a fixed replay boundary and register for live messages under the same
-// lock used by local message insertion/broadcast. This leaves no handoff gap.
+// Subscribe locally before capturing the boundary, including events published
+// by other instances during the query. The writer deduplicates replayed IDs.
 func (h *Handler) registerForReplay(ctx context.Context, c *client, cursor *db.Message, user pgtype.UUID) (*replayPlan, error) {
 	h.messageMu.Lock()
 	defer h.messageMu.Unlock()
+	if !h.hub.register(c) {
+		return nil, errors.New("hub closed")
+	}
 	var plan *replayPlan
 	if cursor != nil {
 		queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		latest, err := h.repo.GetLatestUserMessage(queryCtx, user)
 		if err != nil {
+			h.hub.unregister(c)
 			return nil, err
 		}
 		plan = &replayPlan{after: *cursor, through: latest}
-	}
-	if !h.hub.register(c) {
-		return nil, errors.New("hub closed")
 	}
 	return plan, nil
 }
@@ -66,6 +67,7 @@ func (h *Handler) replay(ctx context.Context, conn socketWriter, c *client, raw 
 		return err
 	}
 	after := plan.after
+	c.replayed = make(map[pgtype.UUID]struct{})
 	for {
 		queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		messages, err := h.repo.ListReplayMessages(queryCtx, db.ListReplayMessagesParams{
@@ -83,7 +85,7 @@ func (h *Handler) replay(ctx context.Context, conn socketWriter, c *client, raw 
 			case <-c.done:
 				return errors.New("connection evicted")
 			case <-ticks:
-				if err := ping(ctx, conn); err != nil {
+				if err := h.heartbeat(ctx, conn, c); err != nil {
 					return err
 				}
 			default:
@@ -102,6 +104,7 @@ func (h *Handler) replay(ctx context.Context, conn socketWriter, c *client, raw 
 				return err
 			}
 			after = message
+			c.replayed[message.ID] = struct{}{}
 		}
 		if len(messages) < 50 {
 			return nil

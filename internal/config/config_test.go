@@ -24,6 +24,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("DATABASE_URL", "")
 			t.Setenv("JWT_SECRET", "")
 			t.Setenv("WS_ORIGIN", "")
+			t.Setenv("REDIS_URL", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()
@@ -47,5 +48,18 @@ func TestLoadDatabaseURL(t *testing.T) {
 	}
 	if cfg.DatabaseURL != "postgres://localhost/pulsechat" {
 		t.Errorf("DatabaseURL = %q", cfg.DatabaseURL)
+	}
+}
+
+func TestLoadRedisURL(t *testing.T) {
+	t.Setenv("SHUTDOWN_TIMEOUT", "")
+	for _, value := range []string{"", "redis://localhost:6379/0"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("REDIS_URL", value)
+			cfg, err := Load()
+			if err != nil || cfg.RedisURL != value {
+				t.Fatalf("RedisURL = %q, error = %v", cfg.RedisURL, err)
+			}
+		})
 	}
 }

@@ -47,7 +47,7 @@ func TestPresenceEndpoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &presenceRepository{testRepository: &testRepository{membershipErr: tt.membershipErr}, membersErr: tt.membersErr}
 			h, token := newTestHandler(t, repo, "")
-			if _, err := h.presence.Connect(context.Background(), "550e8400-e29b-41d4-a716-446655440000"); err != nil {
+			if _, err := h.presence.Connect(context.Background(), "550e8400-e29b-41d4-a716-446655440000", "test-connection"); err != nil {
 				t.Fatal(err)
 			}
 			mux := http.NewServeMux()

@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,25 +13,26 @@ func TestMemoryPresence(t *testing.T) {
 	p := NewMemoryPresence()
 	ctx := context.Background()
 	for _, tt := range []struct {
-		name    string
-		connect bool
-		changed bool
-		count   int
+		name         string
+		connectionID string
+		connect      bool
+		changed      bool
+		count        int
 	}{
-		{"first tab", true, true, 1},
-		{"second tab", true, false, 2},
-		{"one tab leaves", false, false, 1},
-		{"last tab leaves", false, true, 0},
-		{"duplicate disconnect", false, false, 0},
-		{"reconnect", true, true, 1},
+		{"first tab", "a", true, true, 1},
+		{"second tab", "b", true, false, 2},
+		{"one tab leaves", "a", false, false, 1},
+		{"last tab leaves", "b", false, true, 0},
+		{"duplicate disconnect", "b", false, false, 0},
+		{"reconnect", "a", true, true, 1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var changed bool
 			var err error
 			if tt.connect {
-				changed, err = p.Connect(ctx, "alice")
+				changed, err = p.Connect(ctx, "alice", tt.connectionID)
 			} else {
-				changed, err = p.Disconnect(ctx, "alice")
+				changed, err = p.Disconnect(ctx, "alice", tt.connectionID)
 			}
 			if err != nil || changed != tt.changed {
 				t.Fatalf("changed = %v, error = %v", changed, err)
@@ -44,10 +46,10 @@ func TestMemoryPresence(t *testing.T) {
 	}
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err := p.Connect(canceled, "alice"); !errors.Is(err, context.Canceled) {
+	if _, err := p.Connect(canceled, "alice", "a"); !errors.Is(err, context.Canceled) {
 		t.Errorf("Connect error = %v", err)
 	}
-	if _, err := p.Disconnect(canceled, "alice"); !errors.Is(err, context.Canceled) {
+	if _, err := p.Disconnect(canceled, "alice", "a"); !errors.Is(err, context.Canceled) {
 		t.Errorf("Disconnect error = %v", err)
 	}
 	if _, err := p.Counts(canceled, []string{"alice"}); !errors.Is(err, context.Canceled) {
@@ -63,7 +65,7 @@ func TestConcurrentPresence(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			changed, err := p.Connect(context.Background(), "alice")
+			changed, err := p.Connect(context.Background(), "alice", fmt.Sprint(i))
 			if err != nil {
 				t.Error(err)
 			}
@@ -81,7 +83,7 @@ func TestConcurrentPresence(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			changed, err := p.Disconnect(context.Background(), "alice")
+			changed, err := p.Disconnect(context.Background(), "alice", fmt.Sprint(i))
 			if err != nil {
 				t.Error(err)
 			}

@@ -2,30 +2,35 @@ package ws
 
 import (
 	"bytes"
+	"crypto/rand"
 	"sync"
 
 	"github.com/coder/websocket"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type client struct {
-	userID      string
-	send        chan []byte
-	done        chan struct{}
-	closeCode   websocket.StatusCode
-	closeReason string
+	connectionID string
+	replayed     map[pgtype.UUID]struct{} // Written and read only by the socket writer.
+	userID       string
+	send         chan []byte
+	done         chan struct{}
+	closeCode    websocket.StatusCode
+	closeReason  string
 }
 
 func newClient(userID string, buffer int) *client {
-	return &client{userID: userID, send: make(chan []byte, buffer), done: make(chan struct{})}
+	return &client{connectionID: rand.Text(), userID: userID, send: make(chan []byte, buffer), done: make(chan struct{})}
 }
 
 // Hub tracks local connections and room audiences. It never performs socket I/O
 // while holding its lock; a full send queue disconnects only that consumer.
 type Hub struct {
-	mu      sync.Mutex
-	clients map[*client]struct{}
-	rooms   map[string]map[*client]struct{}
-	closed  bool
+	mu        sync.Mutex
+	clients   map[*client]struct{}
+	rooms     map[string]map[*client]struct{}
+	closed    bool
+	publisher Publisher
 }
 
 func NewHub() *Hub {

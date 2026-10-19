@@ -17,7 +17,8 @@ type presenceEvent struct {
 
 // Serialize transitions and delivery so a reconnect cannot overtake an offline
 // event. Shared-room peers receive a single event even with several shared rooms.
-func (h *Handler) changePresence(ctx context.Context, userID string, online bool) error {
+func (h *Handler) changePresence(ctx context.Context, c *client, online bool) error {
+	userID := c.userID
 	h.presenceMu.Lock()
 	defer h.presenceMu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -25,19 +26,22 @@ func (h *Handler) changePresence(ctx context.Context, userID string, online bool
 	var changed bool
 	var err error
 	if online {
-		changed, err = h.presence.Connect(ctx, userID)
+		changed, err = h.presence.Connect(ctx, userID, c.connectionID)
 	} else {
-		changed, err = h.presence.Disconnect(ctx, userID)
+		changed, err = h.presence.Disconnect(ctx, userID, c.connectionID)
 	}
 	if err != nil || !changed {
 		return err
+	}
+	if h.presence.PublishesTransitions() {
+		return nil
 	}
 	recipients, err := h.presenceRecipients(ctx, userID)
 	if err != nil {
 		if online {
 			cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cleanupCancel()
-			_, rollbackErr := h.presence.Disconnect(cleanupCtx, userID)
+			_, rollbackErr := h.presence.Disconnect(cleanupCtx, userID, c.connectionID)
 			return errors.Join(err, rollbackErr)
 		}
 		return err
@@ -46,8 +50,7 @@ func (h *Handler) changePresence(ctx context.Context, userID string, online bool
 	if err != nil {
 		return err
 	}
-	h.hub.BroadcastToUsers(recipients, data)
-	return nil
+	return h.hub.PublishToUsers(ctx, recipients, data)
 }
 
 func (h *Handler) presenceRecipients(ctx context.Context, userID string) ([]string, error) {

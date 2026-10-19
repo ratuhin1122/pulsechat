@@ -2,9 +2,11 @@ package ws
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -38,6 +40,15 @@ func ping(ctx context.Context, conn socketWriter) error {
 	return conn.Ping(pingCtx)
 }
 
+func (h *Handler) heartbeat(ctx context.Context, conn socketWriter, c *client) error {
+	if err := ping(ctx, conn); err != nil {
+		return err
+	}
+	refreshCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return h.presence.Refresh(refreshCtx, c.userID, c.connectionID)
+}
+
 func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, raw string, ticks <-chan time.Time) {
 	for {
 		// Prioritize eviction over any messages still buffered for this client.
@@ -54,6 +65,16 @@ func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, r
 			conn.Close(c.closeCode, c.closeReason)
 			return
 		case data := <-c.send:
+			if c.replayed != nil {
+				var event struct {
+					ID pgtype.UUID `json:"id"`
+				}
+				if json.Unmarshal(data, &event) == nil && event.ID.Valid {
+					if _, duplicate := c.replayed[event.ID]; duplicate {
+						continue
+					}
+				}
+			}
 			if _, err := h.tokens.Validate(raw); err != nil {
 				conn.Close(websocket.StatusPolicyViolation, "access token expired")
 				return
@@ -69,7 +90,7 @@ func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, r
 				conn.Close(websocket.StatusPolicyViolation, "access token expired")
 				return
 			}
-			err := ping(ctx, conn)
+			err := h.heartbeat(ctx, conn, c)
 			if err != nil {
 				conn.CloseNow()
 				return

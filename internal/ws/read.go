@@ -126,6 +126,5 @@ func (h *Handler) persistAndBroadcast(ctx context.Context, room, user pgtype.UUI
 	for _, member := range members {
 		ids = append(ids, member.String())
 	}
-	h.hub.Broadcast(room.String(), ids, data)
-	return nil
+	return h.hub.PublishRoom(ctx, room.String(), ids, data)
 }

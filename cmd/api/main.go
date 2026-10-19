@@ -15,7 +15,6 @@ import (
 	"pulsechat/internal/chat"
 	"pulsechat/internal/config"
 	"pulsechat/internal/store"
-	"pulsechat/internal/ws"
 )
 
 func main() {
@@ -44,12 +43,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer database.Close()
-	hub := ws.NewHub()
-	defer hub.Close()
-	websocketHandler, err := ws.New(ctx, database, tokens, hub, ws.NewMemoryPresence(), logger, cfg.WSOrigin)
+	websocketHandler, closeRealtime, err := newRealtime(ctx, cfg, database, tokens, logger)
 	if err != nil {
 		return err
 	}
+	defer closeRealtime()
 
 	mux := http.NewServeMux()
 	auth.New(database, tokens, logger).RegisterRoutes(mux)

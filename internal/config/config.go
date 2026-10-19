@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	RedisURL        string
 	WSOrigin        string
 	JWTSecret       string
 	DatabaseURL     string
@@ -19,6 +20,7 @@ func Load() (Config, error) {
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	cfg.WSOrigin = os.Getenv("WS_ORIGIN")
+	cfg.RedisURL = os.Getenv("REDIS_URL")
 	if value := os.Getenv("HTTP_ADDR"); value != "" {
 		cfg.HTTPAddr = value
 	}

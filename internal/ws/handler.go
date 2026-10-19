@@ -91,7 +91,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer h.hub.unregister(c)
-	if err := h.changePresence(h.ctx, c.userID, true); err != nil {
+	if err := h.changePresence(h.ctx, c, true); err != nil {
 		h.logger.ErrorContext(h.ctx, "connect presence", "error", err)
 		conn.Close(websocket.StatusInternalError, "presence unavailable")
 		return
@@ -99,7 +99,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		// changePresence starts its timeout after acquiring the transition lock.
 		cleanupCtx := context.WithoutCancel(h.ctx)
-		if err := h.changePresence(cleanupCtx, c.userID, false); err != nil {
+		if err := h.changePresence(cleanupCtx, c, false); err != nil {
 			h.logger.ErrorContext(cleanupCtx, "disconnect presence", "error", err)
 		}
 	}()
