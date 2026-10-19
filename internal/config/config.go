@@ -8,15 +8,16 @@ import (
 )
 
 type Config struct {
-	InspectArchives bool
-	ClamdAddr       string
-	StorageDir      string
-	RedisURL        string
-	WSOrigin        string
-	JWTSecret       string
-	DatabaseURL     string
-	HTTPAddr        string
-	ShutdownTimeout time.Duration
+	TrustedProxyCIDRs string
+	InspectArchives   bool
+	ClamdAddr         string
+	StorageDir        string
+	RedisURL          string
+	WSOrigin          string
+	JWTSecret         string
+	DatabaseURL       string
+	HTTPAddr          string
+	ShutdownTimeout   time.Duration
 }
 
 func Load() (Config, error) {
@@ -28,6 +29,7 @@ func Load() (Config, error) {
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	cfg.WSOrigin = os.Getenv("WS_ORIGIN")
 	cfg.RedisURL = os.Getenv("REDIS_URL")
+	cfg.TrustedProxyCIDRs = os.Getenv("TRUSTED_PROXY_CIDRS")
 	cfg.ClamdAddr = os.Getenv("CLAMD_ADDR")
 	if value := os.Getenv("INSPECT_ARCHIVES"); value != "" {
 		enabled, err := strconv.ParseBool(value)

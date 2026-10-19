@@ -14,6 +14,7 @@ import (
 	"pulsechat/internal/auth"
 	"pulsechat/internal/chat"
 	"pulsechat/internal/config"
+	"pulsechat/internal/httpserver"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
 	"pulsechat/internal/upload"
@@ -32,6 +33,14 @@ func run(logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+	limits, err := httpserver.NewRateLimits(cfg.TrustedProxyCIDRs)
+	if err != nil {
+		return err
+	}
+	monitor, err := httpserver.NewMonitor(logger)
+	if err != nil {
+		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -67,6 +76,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", monitor.Handler())
 	auth.New(database, tokens, logger).RegisterRoutes(mux)
 	chat.New(database, logger).RegisterRoutes(mux, tokens)
 	websocketHandler.RegisterRoutes(mux)
@@ -79,7 +89,7 @@ func run(logger *slog.Logger) error {
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           mux,
+		Handler:           monitor.Wrap(mux, limits.Wrap(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}

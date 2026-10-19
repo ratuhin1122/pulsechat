@@ -1,0 +1,58 @@
+{
+	email {$ACME_EMAIL}
+	# Upstream error logs may also contain a request URI.
+	log default {
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete access_token
+				}
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+			}
+		}
+	}
+}
+
+{$DOMAIN} {
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete access_token
+				}
+			}
+		}
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(self), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self' wss://{$DOMAIN}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+		-Server
+	}
+	encode zstd gzip
+
+	# Scrape api:8080/metrics on the Compose network, not through the public site.
+	@metrics path /metrics /metrics/*
+	handle @metrics {
+		respond 404
+	}
+	@api path /auth /auth/* /rooms /rooms/* /files /files/* /presence /ws /healthz
+	handle @api {
+		reverse_proxy api:8080 {
+			# Always replace client-supplied forwarding headers at the public edge.
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -24,6 +24,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("DATABASE_URL", "")
 			t.Setenv("JWT_SECRET", "")
 			t.Setenv("WS_ORIGIN", "")
+			t.Setenv("TRUSTED_PROXY_CIDRS", "")
 			t.Setenv("REDIS_URL", "")
 			t.Setenv("STORAGE_DIR", "")
 			t.Setenv("CLAMD_ADDR", "")
