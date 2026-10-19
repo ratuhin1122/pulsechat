@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	StorageDir      string
 	RedisURL        string
 	WSOrigin        string
 	JWTSecret       string
@@ -16,7 +17,10 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	cfg := Config{HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second}
+	cfg := Config{HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}
+	if directory := os.Getenv("STORAGE_DIR"); directory != "" {
+		cfg.StorageDir = directory
+	}
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	cfg.WSOrigin = os.Getenv("WS_ORIGIN")

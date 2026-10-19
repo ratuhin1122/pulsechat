@@ -13,8 +13,8 @@ func TestLoad(t *testing.T) {
 		want    Config
 		wantErr bool
 	}{
-		{name: "defaults", want: Config{HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second}},
-		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second}},
+		{name: "defaults", want: Config{HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}},
+		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second, StorageDir: "data"}},
 		{name: "invalid timeout", timeout: "invalid", wantErr: true},
 		{name: "zero timeout", timeout: "0s", wantErr: true},
 		{name: "negative timeout", timeout: "-1s", wantErr: true},
@@ -25,6 +25,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("JWT_SECRET", "")
 			t.Setenv("WS_ORIGIN", "")
 			t.Setenv("REDIS_URL", "")
+			t.Setenv("STORAGE_DIR", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()

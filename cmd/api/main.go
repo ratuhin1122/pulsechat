@@ -14,7 +14,9 @@ import (
 	"pulsechat/internal/auth"
 	"pulsechat/internal/chat"
 	"pulsechat/internal/config"
+	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
+	"pulsechat/internal/upload"
 )
 
 func main() {
@@ -48,11 +50,21 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer closeRealtime()
+	disk, err := storage.NewLocal(cfg.StorageDir)
+	if err != nil {
+		return err
+	}
+	defer disk.Close()
+	uploadLimiter, err := upload.NewMemoryLimiter(10, time.Minute)
+	if err != nil {
+		return err
+	}
 
 	mux := http.NewServeMux()
 	auth.New(database, tokens, logger).RegisterRoutes(mux)
 	chat.New(database, logger).RegisterRoutes(mux, tokens)
 	websocketHandler.RegisterRoutes(mux)
+	upload.New(database, disk, uploadLimiter, logger).RegisterRoutes(mux, tokens)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if _, err := w.Write([]byte("ok\n")); err != nil {
