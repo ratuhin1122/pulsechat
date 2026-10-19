@@ -11,12 +11,13 @@ import (
 )
 
 type messageResponse struct {
-	ID        pgtype.UUID `json:"id"`
-	RoomID    pgtype.UUID `json:"room_id"`
-	SenderID  pgtype.UUID `json:"sender_id"`
-	Type      string      `json:"type"`
-	Body      string      `json:"body"`
-	CreatedAt time.Time   `json:"created_at"`
+	ID          pgtype.UUID          `json:"id"`
+	RoomID      pgtype.UUID          `json:"room_id"`
+	SenderID    pgtype.UUID          `json:"sender_id"`
+	Type        string               `json:"type"`
+	Body        string               `json:"body"`
+	CreatedAt   time.Time            `json:"created_at"`
+	Attachments []AttachmentResponse `json:"attachments,omitempty"`
 }
 
 // History is newest first. The final message ID is the next page's before cursor.
@@ -64,7 +65,18 @@ func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
 	}
 	result := make([]messageResponse, 0, len(messages))
 	for _, message := range messages {
-		result = append(result, messageResponse{message.ID, message.RoomID, message.SenderID, message.Type, message.Body, message.CreatedAt.Time})
+		response := messageResponse{ID: message.ID, RoomID: message.RoomID, SenderID: message.SenderID, Type: message.Type, Body: message.Body, CreatedAt: message.CreatedAt.Time}
+		if message.Type != "text" && message.Type != "" {
+			rows, err := h.repo.ListAttachmentsForMessage(r.Context(), message.ID)
+			if err != nil {
+				h.fail(w, r, err)
+				return
+			}
+			for _, a := range rows {
+				response.Attachments = append(response.Attachments, Attachment(a))
+			}
+		}
+		result = append(result, response)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	h.respond(w, r, http.StatusOK, result)

@@ -28,6 +28,7 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id pgtype.UUID) (int64, error)
 	FindDirectRoom(ctx context.Context, arg FindDirectRoomParams) (Room, error)
 	GetAttachment(ctx context.Context, id pgtype.UUID) (Attachment, error)
+	GetAttachmentForUpdate(ctx context.Context, id pgtype.UUID) (Attachment, error)
 	GetLatestUserMessage(ctx context.Context, userID pgtype.UUID) (Message, error)
 	GetMessage(ctx context.Context, id pgtype.UUID) (Message, error)
 	GetRoom(ctx context.Context, id pgtype.UUID) (Room, error)
@@ -37,6 +38,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserMessage(ctx context.Context, arg GetUserMessageParams) (Message, error)
 	JoinGroupRoom(ctx context.Context, arg JoinGroupRoomParams) (int64, error)
+	LinkAttachmentMessage(ctx context.Context, arg LinkAttachmentMessageParams) error
 	ListAttachmentsForMessage(ctx context.Context, messageID pgtype.UUID) ([]Attachment, error)
 	ListMessages(ctx context.Context, arg ListMessagesParams) ([]Message, error)
 	ListReplayMessages(ctx context.Context, arg ListReplayMessagesParams) ([]Message, error)
@@ -47,6 +49,7 @@ type Querier interface {
 	ListUserRoomIDs(ctx context.Context, userID pgtype.UUID) ([]pgtype.UUID, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockDirectRoomPair(ctx context.Context, pairKey string) error
+	MarkAttachmentNotified(ctx context.Context, id pgtype.UUID) error
 	MarkAttachmentReady(ctx context.Context, id pgtype.UUID) (int64, error)
 	RejectAttachment(ctx context.Context, arg RejectAttachmentParams) (int64, error)
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) (int64, error)

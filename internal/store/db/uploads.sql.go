@@ -12,25 +12,20 @@ import (
 )
 
 const createPendingUpload = `-- name: CreatePendingUpload :one
-WITH media_message AS (
-    INSERT INTO messages (room_id, sender_id, type, body)
-    SELECT $8, $9, $1::text, ''
-    WHERE EXISTS (
-        SELECT 1 FROM room_members
-        WHERE room_id = $8 AND user_id = $9
-    )
-    RETURNING id
-)
 INSERT INTO attachments (
-    message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, status
+    room_id, sender_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, status
 )
-SELECT id, $1::text, $2, $3,
-    $4, $5, $6, $7, 'pending'
-FROM media_message
-RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason, thumbnail_name, quarantine_name
+SELECT $1, $2, $3::text, $4, $5,
+    $6, $7, $8, $9, 'pending'
+WHERE EXISTS (
+    SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2
+)
+RETURNING id, message_id, kind, original_name, stored_name, mime_type, size_bytes, width, height, duration_sec, blurhash, status, created_at, rejection_reason, thumbnail_name, quarantine_name, room_id, sender_id, notified_at
 `
 
 type CreatePendingUploadParams struct {
+	RoomID       pgtype.UUID
+	SenderID     pgtype.UUID
 	Kind         string
 	OriginalName string
 	StoredName   string
@@ -38,12 +33,12 @@ type CreatePendingUploadParams struct {
 	SizeBytes    int64
 	Width        pgtype.Int4
 	Height       pgtype.Int4
-	RoomID       pgtype.UUID
-	SenderID     pgtype.UUID
 }
 
 func (q *Queries) CreatePendingUpload(ctx context.Context, arg CreatePendingUploadParams) (Attachment, error) {
 	row := q.db.QueryRow(ctx, createPendingUpload,
+		arg.RoomID,
+		arg.SenderID,
 		arg.Kind,
 		arg.OriginalName,
 		arg.StoredName,
@@ -51,8 +46,6 @@ func (q *Queries) CreatePendingUpload(ctx context.Context, arg CreatePendingUplo
 		arg.SizeBytes,
 		arg.Width,
 		arg.Height,
-		arg.RoomID,
-		arg.SenderID,
 	)
 	var i Attachment
 	err := row.Scan(
@@ -72,6 +65,9 @@ func (q *Queries) CreatePendingUpload(ctx context.Context, arg CreatePendingUplo
 		&i.RejectionReason,
 		&i.ThumbnailName,
 		&i.QuarantineName,
+		&i.RoomID,
+		&i.SenderID,
+		&i.NotifiedAt,
 	)
 	return i, err
 }

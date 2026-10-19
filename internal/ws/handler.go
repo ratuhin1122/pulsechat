@@ -28,6 +28,7 @@ type Repository interface {
 	GetUserMessage(context.Context, db.GetUserMessageParams) (db.Message, error)
 	GetLatestUserMessage(context.Context, pgtype.UUID) (db.Message, error)
 	ListReplayMessages(context.Context, db.ListReplayMessagesParams) ([]db.Message, error)
+	ListAttachmentsForMessage(context.Context, pgtype.UUID) ([]db.Attachment, error)
 }
 
 type Handler struct {

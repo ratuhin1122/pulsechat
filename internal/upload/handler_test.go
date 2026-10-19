@@ -98,7 +98,7 @@ func TestUploads(t *testing.T) {
 				Status    string `json:"status"`
 				MessageID string `json:"message_id"`
 			}
-			if json.Unmarshal(w.Body.Bytes(), &response) != nil || response.Status != "pending" || response.MessageID == "" {
+			if json.Unmarshal(w.Body.Bytes(), &response) != nil || response.Status != "pending" || response.MessageID != "" {
 				t.Fatalf("wrong response: %s", w.Body.String())
 			}
 			clean, err := os.ReadDir(filepath.Join(dir, "clean"))

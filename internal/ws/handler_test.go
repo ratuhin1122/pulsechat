@@ -22,6 +22,14 @@ import (
 type testRepository struct {
 	membershipErr error
 	insertErr     error
+	attachments   func(context.Context, pgtype.UUID) ([]db.Attachment, error)
+}
+
+func (s *testRepository) ListAttachmentsForMessage(ctx context.Context, id pgtype.UUID) ([]db.Attachment, error) {
+	if s.attachments != nil {
+		return s.attachments(ctx, id)
+	}
+	return nil, nil
 }
 
 func (s *testRepository) GetRoomMember(_ context.Context, p db.GetRoomMemberParams) (db.RoomMember, error) {

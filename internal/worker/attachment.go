@@ -13,6 +13,7 @@ import (
 
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
+	"pulsechat/internal/ws"
 )
 
 type Repository interface {
@@ -31,6 +32,8 @@ type AttachmentHandler struct {
 	images          ImageProcessor
 	voice           VoiceProbe
 	inspectArchives bool
+	completion      CompletionRepository
+	publisher       ws.Publisher
 }
 
 func NewAttachmentHandler(repo Repository, disk storage.Storage, scanner Scanner, logger *slog.Logger, images ...ImageProcessor) *AttachmentHandler {
@@ -42,7 +45,7 @@ func NewAttachmentHandler(repo Repository, disk storage.Storage, scanner Scanner
 	return h
 }
 
-func (h *AttachmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) error {
+func (h *AttachmentHandler) processTask(ctx context.Context, task *asynq.Task) error {
 	var payload attachmentPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("decode attachment task: %v: %w", err, asynq.SkipRetry)

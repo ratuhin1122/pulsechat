@@ -15,6 +15,7 @@ import (
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
 	"pulsechat/internal/worker"
+	"pulsechat/internal/ws"
 )
 
 func main() {
@@ -77,6 +78,7 @@ func run(logger *slog.Logger) error {
 	mux := asynq.NewServeMux()
 	handler := worker.NewAttachmentHandler(database, disk, scanner, logger, images)
 	handler.ConfigureMedia(worker.FFProbe{}, cfg.InspectArchives)
+	handler.ConfigureCompletion(database, ws.NewRedisPubSub(redis, logger))
 	mux.Handle(worker.ProcessAttachment, handler)
 	if err := server.Start(mux); err != nil {
 		return fmt.Errorf("start worker: %w", err)

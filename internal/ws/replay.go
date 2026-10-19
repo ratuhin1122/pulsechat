@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"pulsechat/internal/chat"
 	"pulsechat/internal/store/db"
 )
 
@@ -93,7 +94,17 @@ func (h *Handler) replay(ctx context.Context, conn socketWriter, c *client, raw 
 			if _, err := h.tokens.Validate(raw); err != nil {
 				return err
 			}
-			data, err := marshalMessage(message)
+			var attachments []chat.AttachmentResponse
+			if message.Type != "text" && message.Type != "" {
+				rows, err := h.repo.ListAttachmentsForMessage(ctx, message.ID)
+				if err != nil {
+					return err
+				}
+				for _, a := range rows {
+					attachments = append(attachments, chat.Attachment(a))
+				}
+			}
+			data, err := MarshalAttachmentMessage(message, attachments)
 			if err != nil {
 				return err
 			}

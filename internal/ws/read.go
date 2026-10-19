@@ -25,17 +25,23 @@ type incomingMessage struct {
 }
 
 type outgoingMessage struct {
-	Type      string      `json:"type"`
-	ID        pgtype.UUID `json:"id"`
-	RoomID    pgtype.UUID `json:"room_id"`
-	SenderID  pgtype.UUID `json:"sender_id"`
-	Body      string      `json:"body"`
-	CreatedAt time.Time   `json:"created_at"`
+	Type        string                    `json:"type"`
+	ID          pgtype.UUID               `json:"id"`
+	RoomID      pgtype.UUID               `json:"room_id"`
+	SenderID    pgtype.UUID               `json:"sender_id"`
+	Body        string                    `json:"body"`
+	CreatedAt   time.Time                 `json:"created_at"`
+	MessageType string                    `json:"message_type,omitempty"`
+	Attachments []chat.AttachmentResponse `json:"attachments,omitempty"`
 }
 
 func marshalMessage(message db.Message) ([]byte, error) {
-	return json.Marshal(outgoingMessage{Type: "message", ID: message.ID, RoomID: message.RoomID,
-		SenderID: message.SenderID, Body: message.Body, CreatedAt: message.CreatedAt.Time})
+	return MarshalAttachmentMessage(message, nil)
+}
+
+func MarshalAttachmentMessage(message db.Message, attachments []chat.AttachmentResponse) ([]byte, error) {
+	return json.Marshal(outgoingMessage{Type: "message", ID: message.ID, RoomID: message.RoomID, SenderID: message.SenderID,
+		Body: message.Body, CreatedAt: message.CreatedAt.Time, MessageType: message.Type, Attachments: attachments})
 }
 
 func parseMessage(data []byte) (incomingMessage, pgtype.UUID, error) {

@@ -20,14 +20,22 @@ import (
 
 type fakeRepository struct {
 	Repository
-	create  func(context.Context, string, pgtype.UUID) (db.Room, error)
-	direct  func(context.Context, pgtype.UUID, pgtype.UUID) (db.Room, error)
-	get     func(context.Context, pgtype.UUID) (db.Room, error)
-	join    func(context.Context, db.JoinGroupRoomParams) (int64, error)
-	leave   func(context.Context, db.RemoveRoomMemberParams) (int64, error)
-	rooms   func(context.Context, db.ListRoomsForUserParams) ([]db.Room, error)
-	member  func(context.Context, db.GetRoomMemberParams) (db.RoomMember, error)
-	members func(context.Context, db.ListRoomMembersParams) ([]db.RoomMember, error)
+	create      func(context.Context, string, pgtype.UUID) (db.Room, error)
+	direct      func(context.Context, pgtype.UUID, pgtype.UUID) (db.Room, error)
+	get         func(context.Context, pgtype.UUID) (db.Room, error)
+	join        func(context.Context, db.JoinGroupRoomParams) (int64, error)
+	leave       func(context.Context, db.RemoveRoomMemberParams) (int64, error)
+	rooms       func(context.Context, db.ListRoomsForUserParams) ([]db.Room, error)
+	member      func(context.Context, db.GetRoomMemberParams) (db.RoomMember, error)
+	members     func(context.Context, db.ListRoomMembersParams) ([]db.RoomMember, error)
+	attachments func(context.Context, pgtype.UUID) ([]db.Attachment, error)
+}
+
+func (f *fakeRepository) ListAttachmentsForMessage(ctx context.Context, id pgtype.UUID) ([]db.Attachment, error) {
+	if f.attachments != nil {
+		return f.attachments(ctx, id)
+	}
+	return nil, nil
 }
 
 func (f *fakeRepository) CreateGroupRoom(ctx context.Context, name string, id pgtype.UUID) (db.Room, error) {

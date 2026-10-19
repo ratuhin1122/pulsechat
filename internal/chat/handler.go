@@ -26,6 +26,7 @@ type Repository interface {
 	ListRoomMembers(context.Context, db.ListRoomMembersParams) ([]db.RoomMember, error)
 	GetRoomMessage(context.Context, db.GetRoomMessageParams) (db.Message, error)
 	ListRoomHistory(context.Context, db.ListRoomHistoryParams) ([]db.Message, error)
+	ListAttachmentsForMessage(context.Context, pgtype.UUID) ([]db.Attachment, error)
 }
 
 type Handler struct {

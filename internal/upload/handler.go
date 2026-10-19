@@ -22,6 +22,7 @@ import (
 type Repository interface {
 	chat.MembershipReader
 	CreatePendingUpload(context.Context, db.CreatePendingUploadParams) (db.Attachment, error)
+	GetAttachment(context.Context, pgtype.UUID) (db.Attachment, error)
 }
 
 type Enqueuer interface {
@@ -42,6 +43,7 @@ func New(repo Repository, disk storage.Storage, limiter RateLimiter, queue Enque
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, tokens *auth.Tokens) {
 	mux.Handle("POST /rooms/{roomID}/upload", tokens.Middleware(http.HandlerFunc(h.upload)))
+	mux.Handle("GET /files/{id}", tokens.Middleware(http.HandlerFunc(h.file)))
 }
 
 func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {

@@ -1,14 +1,23 @@
 -- name: CreateAttachment :one
 INSERT INTO attachments (
-    message_id, kind, original_name, stored_name, mime_type, size_bytes,
+    message_id, room_id, sender_id, kind, original_name, stored_name, mime_type, size_bytes,
     width, height, duration_sec, blurhash
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *;
 
 -- name: GetAttachment :one
 SELECT * FROM attachments WHERE id = $1;
 
+-- name: GetAttachmentForUpdate :one
+SELECT * FROM attachments WHERE id = $1 FOR UPDATE;
+
+-- name: LinkAttachmentMessage :exec
+UPDATE attachments SET message_id = $2 WHERE id = $1;
+
+-- name: MarkAttachmentNotified :exec
+UPDATE attachments SET notified_at = now() WHERE id = $1 AND status IN ('ready', 'rejected');
+
 -- name: ListAttachmentsForMessage :many
-SELECT * FROM attachments WHERE message_id = $1 ORDER BY created_at, id;
+SELECT * FROM attachments WHERE message_id = $1 AND status = 'ready' ORDER BY created_at, id;
 
 -- name: UpdateAttachment :one
 UPDATE attachments SET mime_type = $2, size_bytes = $3, width = $4,

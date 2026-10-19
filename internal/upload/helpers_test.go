@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgtype"
 	"image"
 	"image/color/palette"
 	"image/gif"
@@ -31,6 +32,12 @@ type testRepository struct {
 	inserted             []db.CreatePendingUploadParams
 	enqueued             []string
 	queueErr             error
+	attachment           db.Attachment
+	fileErr              error
+}
+
+func (s *testRepository) GetAttachment(_ context.Context, _ pgtype.UUID) (db.Attachment, error) {
+	return s.attachment, s.fileErr
 }
 
 func (s *testRepository) EnqueueAttachment(_ context.Context, id string) error {
@@ -46,7 +53,7 @@ func (s *testRepository) GetRoomMember(_ context.Context, p db.GetRoomMemberPara
 }
 func (s *testRepository) CreatePendingUpload(_ context.Context, p db.CreatePendingUploadParams) (db.Attachment, error) {
 	s.inserted = append(s.inserted, p)
-	return db.Attachment{ID: p.RoomID, MessageID: p.SenderID, Kind: p.Kind, Status: "pending"}, s.insertErr
+	return db.Attachment{ID: p.RoomID, RoomID: p.RoomID, SenderID: p.SenderID, Kind: p.Kind, Status: "pending"}, s.insertErr
 }
 
 func testHandler(t *testing.T, repo *testRepository, limit int) (*http.ServeMux, string, string) {

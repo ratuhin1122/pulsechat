@@ -25,6 +25,9 @@ type Attachment struct {
 	RejectionReason pgtype.Text
 	ThumbnailName   pgtype.Text
 	QuarantineName  pgtype.Text
+	RoomID          pgtype.UUID
+	SenderID        pgtype.UUID
+	NotifiedAt      pgtype.Timestamptz
 }
 
 type Message struct {
