@@ -22,13 +22,22 @@ type Repository interface {
 }
 
 type Handler struct {
-	repo   Repository
-	tokens *Tokens
-	logger *slog.Logger
+	localHTTP bool
+	repo      Repository
+	tokens    *Tokens
+	logger    *slog.Logger
 }
 
 func New(repo Repository, tokens *Tokens, logger *slog.Logger) *Handler {
-	return &Handler{repo: repo, tokens: tokens, logger: logger}
+	return NewWithOptions(repo, tokens, logger, Options{})
+}
+
+// LocalHTTP is only for the loopback development deployment. Production defaults
+// to a Secure cookie with a __Secure- prefix.
+type Options struct{ LocalHTTP bool }
+
+func NewWithOptions(repo Repository, tokens *Tokens, logger *slog.Logger, options Options) *Handler {
+	return &Handler{repo: repo, tokens: tokens, logger: logger, localHTTP: options.LocalHTTP}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {

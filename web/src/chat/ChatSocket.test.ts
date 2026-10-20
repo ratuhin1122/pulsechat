@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { ChatSocket } from './ChatSocket';
 import { sampleMessage, TestSocket } from './testSocket';
-import { compareMessages, mergeMessages } from './types';
+import { compareMessages, mergeMessages, parseEvent } from './types';
 
 function setup() {
   vi.useFakeTimers(); TestSocket.instances = [];
@@ -125,4 +125,31 @@ it('deduplicates replay/history overlap and orders PostgreSQL microsecond timest
   const second = sampleMessage('00000000-0000-4000-8000-000000000002', '2026-10-19T12:00:00.000002Z');
   expect(compareMessages(first, second)).toBeLessThan(0);
   expect(mergeMessages([second, first], [first])).toEqual([first, second]);
+});
+
+it('refreshes before every reconnect even when the old token has not expired', async () => {
+  const { client, session } = setup(); client.start(); await tick();
+  TestSocket.instances[0].open(); TestSocket.instances[0].drop();
+  await vi.advanceTimersByTimeAsync(750);
+  expect(session.refresh).toHaveBeenCalledTimes(1);
+  expect(new URL(TestSocket.instances[1].url).searchParams.get('access_token')).toBe('fresh-token');
+  TestSocket.instances[1].open(); client.setOnline(false); client.setOnline(true); await tick();
+  expect(session.refresh).toHaveBeenCalledTimes(2);
+});
+
+it('does not reconnect until refresh succeeds and cancels a pending refresh on stop', async () => {
+  const { client, session } = setup(); client.start(); await tick();
+  TestSocket.instances[0].open(); TestSocket.instances[0].drop();
+  let resolve!: (token: string) => void;
+  session.refresh.mockImplementation(() => new Promise((done) => { resolve = done; }));
+  await vi.advanceTimersByTimeAsync(750); expect(TestSocket.instances).toHaveLength(1);
+  client.stop(); resolve('late'); await tick(); expect(TestSocket.instances).toHaveLength(1);
+});
+
+it.each([
+  [{ type: 'read', room_id: 'room-1', user_id: 'other', message_id: 'm1' }, true],
+  [{ type: 'read', room_id: '', user_id: 'other', message_id: 'm1' }, false],
+  [{ type: 'read', room_id: 'room-1', user_id: 4, message_id: 'm1' }, false],
+])('validates read event fields: %j', (event, valid) => {
+  expect(parseEvent(JSON.stringify(event)) !== null).toBe(valid);
 });

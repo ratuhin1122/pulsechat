@@ -27,6 +27,7 @@ export interface PresenceChange { online: boolean; revision: number }
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
 export type ServerEvent = { type: 'message'; message: Message }
   | { type: 'attachment_status'; attachment_id: string; status: 'ready' | 'rejected' }
+  | { type: 'read'; room_id: string; user_id: string; message_id: string }
   | { type: 'presence'; user_id: string; online: boolean } | { type: 'pong' };
 
 export function isMessage(value: unknown): value is Message {
@@ -58,6 +59,9 @@ export function parseEvent(raw: unknown): ServerEvent | null {
   try {
     const value = JSON.parse(raw) as Record<string, unknown> | null;
     if (!value || typeof value !== 'object') return null;
+    if (value.type === 'read' && ['room_id', 'user_id', 'message_id'].every((key) => typeof value[key] === 'string' && value[key])) {
+      return { type: 'read', room_id: value.room_id as string, user_id: value.user_id as string, message_id: value.message_id as string };
+    }
     if (value.type === 'pong') return { type: 'pong' };
     if (value.type === 'attachment_status' && typeof value.attachment_id === 'string' && value.attachment_id
       && (value.status === 'ready' || value.status === 'rejected')) {

@@ -32,3 +32,14 @@ it('anchors the visible message when a live append overlaps an older-history pre
   // Only the prepended 140px shifts the anchor, not the 200px live append.
   expect(log.scrollTop).toBe(160);
 });
+
+it('shows ticks only on own messages and ignores self read markers', () => {
+  const own = { ...sampleMessage(), sender_id: 'me' };
+  const later = { ...sampleMessage('later', '2026-10-19T12:01:00Z'), sender_id: 'other' };
+  const props = { messages: [own, later], loading: false, initialized: true, more: false, error: '', online: {},
+    loadOlder: vi.fn(), retry: vi.fn(), userID: 'me' };
+  const view = render(<MessageList {...props} reads={{ me: ['later'] }} />);
+  expect(screen.getAllByLabelText('Sent')).toHaveLength(1); expect(screen.queryByLabelText('Read')).toBeNull();
+  view.rerender(<MessageList {...props} reads={{ other: ['later'] }} />);
+  expect(screen.getAllByLabelText('Read')).toHaveLength(1);
+});

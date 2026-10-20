@@ -12,14 +12,14 @@ import (
 )
 
 // CreateGroupRoom commits the room and its creator's membership together.
-func (s *Store) CreateGroupRoom(ctx context.Context, name string, creator pgtype.UUID) (db.Room, error) {
+func (s *Store) CreateGroupRoom(ctx context.Context, name string, creator pgtype.UUID, public bool) (db.Room, error) {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return db.Room{}, fmt.Errorf("begin group room: %w", err)
 	}
 	defer tx.Rollback(ctx)
 	q := s.Queries.WithTx(tx)
-	room, err := q.CreateRoom(ctx, db.CreateRoomParams{Type: "group", Name: name})
+	room, err := q.CreateRoom(ctx, db.CreateRoomParams{Type: "group", Name: name, IsPublic: public})
 	if err != nil {
 		return db.Room{}, fmt.Errorf("create group room: %w", err)
 	}

@@ -4,6 +4,8 @@ import type { LoginInput, RegisterInput, TokenResponse } from '../api/types';
 export interface SessionSnapshot {
   status: 'checking' | 'anonymous' | 'authenticated' | 'unavailable';
   error: string | null;
+  userID?: string;
+  displayName?: string;
 }
 
 // Tokens live only in this instance. The refresh cookie is owned by the server.
@@ -27,7 +29,7 @@ export class Session {
   };
 
   private update(status: SessionSnapshot['status'], error: string | null = null) {
-    this.snapshot = { status, error };
+    this.snapshot = { ...this.snapshot, status, error, ...(status === 'anonymous' ? { userID: undefined, displayName: undefined } : {}) };
     this.listeners.forEach((listener) => listener());
   }
 
@@ -44,6 +46,13 @@ export class Session {
       throw new ApiError(502, 'The server returned an invalid session.');
     }
     this.token = response.access_token;
+    try {
+      const encoded = this.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0))));
+      this.snapshot = { ...this.snapshot, userID: typeof claims.sub === 'string' ? claims.sub : undefined,
+        displayName: typeof claims.display_name === 'string' && claims.display_name.trim() ? claims.display_name
+          : typeof claims.username === 'string' ? claims.username : this.snapshot.displayName };
+    } catch { /* Identity labels are optional; authorization remains server-side. */ }
     this.expiresAt = Date.now() + response.expires_in * 1000;
     this.update('authenticated');
     this.schedule();
@@ -100,11 +109,19 @@ export class Session {
   expire(token: string) { if (this.token === token) this.clear(); }
 
   async login(input: LoginInput): Promise<void> {
-    await this.enqueue(async () => { this.accept(await this.http.post<TokenResponse>('/auth/login', input)); });
+    await this.enqueue(async () => {
+      const response = await this.http.post<TokenResponse>('/auth/login', input);
+      this.snapshot = { ...this.snapshot, displayName: input.email.split('@')[0] };
+      this.accept(response);
+    });
   }
 
   async register(input: RegisterInput): Promise<void> {
-    await this.enqueue(async () => { this.accept(await this.http.post<TokenResponse>('/auth/register', input)); });
+    await this.enqueue(async () => {
+      const response = await this.http.post<TokenResponse>('/auth/register', input);
+      this.snapshot = { ...this.snapshot, displayName: input.username };
+      this.accept(response);
+    });
   }
 
   async logout(): Promise<void> {

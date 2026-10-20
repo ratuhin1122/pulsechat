@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+import { errorMessage } from '../api/http';
 import { useAuth } from '../auth/AuthProvider';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
@@ -9,9 +11,24 @@ import type { useUploads } from './useUploads';
 import { AttachmentComposer } from './AttachmentComposer';
 
 export function ChatView({ roomID, realtime, uploads }: { roomID: string; realtime: ReturnType<typeof useChatSocket>; uploads: ReturnType<typeof useUploads> }) {
-  const { api } = useAuth();
+  const { api, userID } = useAuth();
   const history = useHistory(api, roomID, realtime.messages[roomID] ?? [], realtime.epoch, realtime.seedCursor);
   const presence = usePresence(api, roomID, realtime.epoch, realtime.presence, realtime.status === 'connected');
+  const [readError, setReadError] = useState('');
+  const marked = useRef('');
+  const latest = history.messages.at(-1)?.id;
+  useEffect(() => {
+    const controller = new AbortController();
+    const mark = () => {
+      if (!latest || !history.initialized || document.visibilityState === 'hidden' || marked.current === latest) return;
+      marked.current = latest;
+      void api.markRead(roomID, latest, controller.signal).then(() => setReadError('')).catch((error: unknown) => {
+        if (!controller.signal.aborted) { marked.current = ''; setReadError(errorMessage(error)); }
+      });
+    };
+    mark(); document.addEventListener('visibilitychange', mark); window.addEventListener('focus', mark);
+    return () => { controller.abort(); if (marked.current === latest) marked.current = ''; document.removeEventListener('visibilitychange', mark); window.removeEventListener('focus', mark); };
+  }, [api, roomID, latest, history.initialized, realtime.epoch]);
   const count = presence.members.filter((id) => presence.online[id]).length;
   const attachmentStatuses = { ...realtime.attachments,
     ...Object.fromEntries(history.messages.flatMap((message) => (message.attachments ?? []).map((item) => [item.id, 'ready' as const]))),
@@ -32,7 +49,8 @@ export function ChatView({ roomID, realtime, uploads }: { roomID: string; realti
         <ul>{presence.members.map((id) => <li key={id}><PresenceDot online={presence.online[id]} /><span title={id}>User {id.slice(0, 8)}</span></li>)}</ul>
       </details>
     </div>
-    <MessageList {...history} online={presence.online} />
+    <MessageList {...history} online={presence.online} userID={userID} reads={realtime.reads?.[roomID]} />
+    {readError && <p className="error-message" role="alert">Could not update read status: {readError}</p>}
     <Composer roomID={roomID} status={realtime.status} ready={history.initialized} send={realtime.send} />
     <AttachmentComposer roomID={roomID} uploads={uploads} statuses={attachmentStatuses} ready={history.initialized && realtime.status === 'connected'} />
   </section>;

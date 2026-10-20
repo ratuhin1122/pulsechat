@@ -15,6 +15,7 @@ import (
 
 	"pulsechat/internal/auth"
 	"pulsechat/internal/chat"
+	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
 )
@@ -35,11 +36,15 @@ type Handler struct {
 	limiter RateLimiter
 	logger  *slog.Logger
 	queue   Enqueuer
+	metrics *metrics.Metrics
 }
 
 func New(repo Repository, disk storage.Storage, limiter RateLimiter, queue Enqueuer, logger *slog.Logger) *Handler {
 	return &Handler{repo: repo, storage: disk, limiter: limiter, queue: queue, logger: logger}
 }
+
+// WithMetrics is configured before serving requests.
+func (h *Handler) WithMetrics(m *metrics.Metrics) *Handler { h.metrics = m; return h }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, tokens *auth.Tokens) {
 	mux.Handle("POST /rooms/{roomID}/upload", tokens.Middleware(http.HandlerFunc(h.upload)))
@@ -102,6 +107,9 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	committed = true
+	if h.metrics != nil {
+		h.metrics.Uploads.WithLabelValues("accepted").Inc()
+	}
 	// Once the row exists, preserve its file even if Redis is unavailable. Queueing
 	// has its own bounded context so a disconnected client cannot cancel the job.
 	enqueueCtx, enqueueCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
@@ -129,6 +137,9 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var invalidFile *validationError
 	var tooLarge *http.MaxBytesError
+	if h.metrics != nil && r.Method == http.MethodPost && (errors.As(err, &invalidFile) || errors.As(err, &tooLarge) || errors.Is(err, io.ErrUnexpectedEOF)) {
+		h.metrics.Uploads.WithLabelValues("rejected_stage1").Inc()
+	}
 	switch {
 	case errors.As(err, &invalidFile):
 		http.Error(w, invalidFile.message, invalidFile.status)

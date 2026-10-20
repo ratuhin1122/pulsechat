@@ -20,7 +20,7 @@ type Monitor struct {
 	logger   *slog.Logger
 }
 
-func NewMonitor(logger *slog.Logger) (*Monitor, error) {
+func NewMonitor(logger *slog.Logger, registries ...*prometheus.Registry) (*Monitor, error) {
 	m := &Monitor{
 		registry: prometheus.NewRegistry(), logger: logger,
 		requests: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -33,6 +33,9 @@ func NewMonitor(logger *slog.Logger) (*Monitor, error) {
 		active: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "pulsechat_http_requests_in_flight", Help: "Active HTTP requests, including WebSocket connections.",
 		}),
+	}
+	if len(registries) > 0 {
+		m.registry = registries[0]
 	}
 	for _, collector := range []prometheus.Collector{m.requests, m.duration, m.active, collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})} {
 		if err := m.registry.Register(collector); err != nil {

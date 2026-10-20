@@ -23,6 +23,7 @@ async function setup(history: (before: string | null) => Promise<Message[]> = as
     const url = new URL(String(path), 'https://chat.test');
     if (url.pathname === '/auth/refresh') return Response.json({ access_token: 'token', token_type: 'Bearer', expires_in: 900 });
     if (url.pathname === '/rooms') return Response.json([{ id: 'room-1', type: 'group', name: 'Engineering', created_at: '2026-10-19T00:00:00Z' }]);
+    if (url.pathname.endsWith('/read')) return new Response(null, { status: 204 });
     if (url.pathname === '/presence') return Response.json([{ user_id: 'user-1', online: true }]);
     return Response.json(await history(url.searchParams.get('before')));
   });

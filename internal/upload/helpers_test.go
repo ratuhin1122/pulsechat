@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"pulsechat/internal/auth"
+	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
 )
@@ -56,7 +57,7 @@ func (s *testRepository) CreatePendingUpload(_ context.Context, p db.CreatePendi
 	return db.Attachment{ID: p.RoomID, RoomID: p.RoomID, SenderID: p.SenderID, Kind: p.Kind, Status: "pending"}, s.insertErr
 }
 
-func testHandler(t *testing.T, repo *testRepository, limit int) (*http.ServeMux, string, string) {
+func testHandler(t *testing.T, repo *testRepository, limit int, meters ...*metrics.Metrics) (*http.ServeMux, string, string) {
 	t.Helper()
 	dir := t.TempDir()
 	disk, err := storage.NewLocal(dir)
@@ -77,7 +78,11 @@ func testHandler(t *testing.T, repo *testRepository, limit int) (*http.ServeMux,
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	New(repo, disk, limiter, repo, slog.New(slog.NewTextHandler(io.Discard, nil))).RegisterRoutes(mux, tokens)
+	handler := New(repo, disk, limiter, repo, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if len(meters) > 0 {
+		handler.WithMetrics(meters[0])
+	}
+	handler.RegisterRoutes(mux, tokens)
 	return mux, token, dir
 }
 

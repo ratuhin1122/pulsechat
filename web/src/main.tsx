@@ -11,6 +11,7 @@ import './styles/auth.css';
 import './styles/workspace.css';
 import './styles/chat.css';
 import './styles/attachments.css';
+import './styles/room-actions.css';
 
 const http = new HttpClient();
 const session = new Session(http);

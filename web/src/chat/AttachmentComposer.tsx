@@ -19,12 +19,13 @@ export function AttachmentComposer({ roomID, uploads, statuses, ready }: {
     <div className="upload-drafts" aria-label="Attachments">
       {uploads.items.filter((item) => item.roomID === roomID).map((item) => {
         const status = item.id ? statuses[item.id] : undefined;
-        return <div className="upload-draft" key={item.key}>
+        return <div className={`upload-draft${status === 'rejected' || item.state === 'error' ? ' is-rejected' : ''}`} data-state={status === 'rejected' || item.state === 'error' ? 'rejected' : item.state} key={item.key}>
           {item.preview && (fileKind(item.file) === 'image' ? <img src={item.preview} alt={`Preview of ${item.file.name}`} />
             : <audio controls src={item.preview} aria-label={`Preview of ${item.file.name}`} />)}
           <div className="upload-description"><strong>{item.file.name}</strong><span>{fileSize(item.file.size)}</span>
             {item.state === 'uploading' && <><progress max={100} value={item.progress} aria-label={`Uploading ${item.file.name}`} /><span>{item.progress}% uploaded</span></>}
             <span role="status">{status === 'ready' ? 'Ready · sent' : status === 'rejected' ? 'Rejected by file validation'
+              : item.state === 'error' ? 'Rejected · not sent'
               : item.state === 'processing' ? 'Processing… Waiting for server validation.' : item.state === 'uploading' ? 'Uploading…' : ''}</span>
             {item.error && <span role="alert" className="error-message">{item.error}</span>}
           </div>

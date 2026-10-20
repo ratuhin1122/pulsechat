@@ -51,12 +51,14 @@ type Room struct {
 	Type      string
 	Name      string
 	CreatedAt pgtype.Timestamptz
+	IsPublic  bool
 }
 
 type RoomMember struct {
-	RoomID   pgtype.UUID
-	UserID   pgtype.UUID
-	JoinedAt pgtype.Timestamptz
+	RoomID            pgtype.UUID
+	UserID            pgtype.UUID
+	JoinedAt          pgtype.Timestamptz
+	LastReadMessageID pgtype.UUID
 }
 
 type User struct {
@@ -65,4 +67,5 @@ type User struct {
 	Email        string
 	PasswordHash string
 	CreatedAt    pgtype.Timestamptz
+	DisplayName  string
 }

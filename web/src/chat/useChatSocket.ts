@@ -11,6 +11,7 @@ export function useChatSocket(session: Session) {
   const [epoch, setEpoch] = useState(0);
   const [attachments, setAttachments] = useState<Record<string, 'ready' | 'rejected'>>({});
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
+  const [reads, setReads] = useState<Record<string, Record<string, string[]>>>({});
   const [presence, setPresence] = useState<Record<string, PresenceChange>>({});
   useEffect(() => {
     const client = new ChatSocket(session, {
@@ -27,6 +28,9 @@ export function useChatSocket(session: Session) {
           }));
         } else if (event.type === 'attachment_status') {
           setAttachments((previous) => ({ ...previous, [event.attachment_id]: event.status }));
+        } else if (event.type === 'read') {
+          setReads((previous) => ({ ...previous, [event.room_id]: { ...previous[event.room_id],
+            [event.user_id]: [...new Set([...(previous[event.room_id]?.[event.user_id] ?? []), event.message_id])] } }));
         } else if (event.type === 'presence') {
           const change = { online: event.online, revision: ++revision.current };
           setPresence((previous) => ({ ...previous, [event.user_id]: change }));
@@ -45,5 +49,5 @@ export function useChatSocket(session: Session) {
   }, [session]);
   const send = useCallback((roomID: string, body: string) => socket.current?.send(roomID, body) ?? false, []);
   const seedCursor = useCallback((message: Message) => socket.current?.seedCursor(message), []);
-  return { status, epoch, messages, presence, attachments, send, seedCursor };
+  return { status, epoch, reads, messages, presence, attachments, send, seedCursor };
 }

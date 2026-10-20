@@ -78,6 +78,9 @@ func (h *Handler) readLoop(ctx context.Context, conn *websocket.Conn, c *client,
 	for {
 		kind, data, err := conn.Read(ctx)
 		if err != nil {
+			if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+				c.disconnect.CompareAndSwap(0, 1)
+			}
 			return
 		}
 		if _, err := h.tokens.Validate(raw); err != nil {

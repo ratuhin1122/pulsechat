@@ -15,10 +15,11 @@ type roomResponse struct {
 	Type      string      `json:"type"`
 	Name      string      `json:"name"`
 	CreatedAt time.Time   `json:"created_at"`
+	IsPublic  bool        `json:"is_public"`
 }
 
 func roomView(room db.Room) roomResponse {
-	return roomResponse{room.ID, room.Type, room.Name, room.CreatedAt.Time}
+	return roomResponse{ID: room.ID, Type: room.Type, Name: room.Name, CreatedAt: room.CreatedAt.Time, IsPublic: room.IsPublic}
 }
 
 func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +29,8 @@ func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Name string `json:"name"`
+		Name     string `json:"name"`
+		IsPublic bool   `json:"is_public"`
 	}
 	if !decodeBody(w, r, &input) {
 		return
@@ -38,7 +40,7 @@ func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name must be between 1 and 100 bytes", http.StatusBadRequest)
 		return
 	}
-	room, err := h.repo.CreateGroupRoom(r.Context(), input.Name, user)
+	room, err := h.repo.CreateGroupRoom(r.Context(), input.Name, user, input.IsPublic)
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -68,7 +70,14 @@ func (h *Handler) direct(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	h.respond(w, r, http.StatusOK, roomView(room))
+	person, err := h.repo.GetUser(r.Context(), peer)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	view := roomView(room)
+	view.Name = person.Username
+	h.respond(w, r, http.StatusOK, view)
 }
 
 func (h *Handler) groupRoom(w http.ResponseWriter, r *http.Request) (pgtype.UUID, bool) {

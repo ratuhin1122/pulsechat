@@ -1,14 +1,18 @@
 import { useLayoutEffect, useRef } from 'react';
 import { PresenceDot } from './PresenceDot';
+import { compareMessages } from './types';
 import type { Message } from './types';
 import { AttachmentBubble } from './AttachmentBubble';
 
 interface Props {
+  userID?: string; reads?: Record<string, string[]>;
   messages: Message[]; loading: boolean; initialized: boolean; more: boolean; error: string;
   online: Record<string, boolean | undefined>; loadOlder: () => Promise<void>; retry: () => Promise<void>;
 }
 
-export function MessageList({ messages, loading, initialized, more, error, online, loadOlder, retry }: Props) {
+export function MessageList({ userID, reads = {}, messages, loading, initialized, more, error, online, loadOlder, retry }: Props) {
+  const isRead = (message: Message) => Object.entries(reads).some(([user, ids]) => user !== userID
+    && messages.some((marker) => ids.includes(marker.id) && compareMessages(marker, message) >= 0));
   const viewport = useRef<HTMLDivElement>(null);
   const bottom = useRef(true);
   const initial = useRef(true);
@@ -63,6 +67,7 @@ export function MessageList({ messages, loading, initialized, more, error, onlin
         <time dateTime={message.created_at} title={new Date(message.created_at).toLocaleString()}>
           {new Date(message.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
         </time>
+        {message.sender_id === userID && <span className="read-receipt" aria-label={isRead(message) ? 'Read' : 'Sent'}>{isRead(message) ? '✓✓' : '✓'}</span>}
       </header>
       {message.body && <p className="message-body">{message.body}</p>}
       {message.attachments?.map((attachment) => <AttachmentBubble key={attachment.id} attachment={attachment} />)}

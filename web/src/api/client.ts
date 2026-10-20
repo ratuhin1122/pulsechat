@@ -1,6 +1,6 @@
 import { ApiError, HttpClient } from './http';
-import { isRoom } from './types';
-import type { Room } from './types';
+import { isRoom, isChatUser } from './types';
+import type { Room, ChatUser, RoomMember } from './types';
 import type { Session } from '../auth/session';
 import { isMessage, isPresence } from '../chat/types';
 import type { Message, Presence } from '../chat/types';
@@ -33,6 +33,28 @@ export class ApiClient {
     return this.authorized((token) => uploadFile(roomID, file, token, progress, signal), signal);
   }
 
+  private async postRoom(path: string, body: unknown, signal: AbortSignal): Promise<Room> {
+    const result = await this.authorized((token) => this.http.send<unknown>(path, {
+      method: 'POST', signal, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }), signal);
+    if (!isRoom(result)) throw new ApiError(502, 'The server returned an invalid conversation. Check your list before trying again.');
+    return result;
+  }
+
+  createGroup(name: string, signal: AbortSignal, isPublic = false): Promise<Room> {
+    return this.postRoom('/rooms', { name, is_public: isPublic }, signal);
+  }
+
+  directMessage(userID: string, signal: AbortSignal): Promise<Room> {
+    return this.postRoom('/rooms/dm', { user_id: userID }, signal);
+  }
+
+  async searchUsers(search: string, signal: AbortSignal): Promise<ChatUser[]> {
+    const result = await this.get<unknown>(`/users?${new URLSearchParams({ q: search })}`, signal);
+    if (!Array.isArray(result) || !result.every(isChatUser)) throw new ApiError(502, 'Could not read the user search results.');
+    return result;
+  }
+
   private async get<T>(path: string, signal?: AbortSignal): Promise<T> {
     let token = await this.session.getAccessToken();
     signal?.throwIfAborted();
@@ -48,6 +70,33 @@ export class ApiClient {
         throw retryError;
       }
     }
+  }
+
+  async publicRooms(q: string, offset: number, signal: AbortSignal): Promise<Room[]> {
+    const result = await this.get<unknown>(`/rooms/public?${new URLSearchParams({ q, limit: '20', offset: String(offset) })}`, signal);
+    if (!Array.isArray(result) || !result.every(isRoom) || result.some((room) => room.type !== 'group' || !room.is_public)) throw new ApiError(502, 'Could not read public rooms.');
+    return result;
+  }
+
+  private postEmpty(path: string, signal: AbortSignal): Promise<void> {
+    return this.authorized((token) => this.http.send<void>(path, { method: 'POST', signal, headers: { Authorization: `Bearer ${token}` } }), signal);
+  }
+
+  markRead(id: string, messageID: string, signal: AbortSignal): Promise<void> {
+    return this.authorized((token) => this.http.send<void>(`/rooms/${encodeURIComponent(id)}/read`, { method: 'POST', signal, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message_id: messageID }) }), signal);
+  }
+
+  joinRoom(id: string, signal: AbortSignal): Promise<void> { return this.postEmpty(`/rooms/${encodeURIComponent(id)}/join`, signal); }
+  leaveRoom(id: string, signal: AbortSignal): Promise<void> { return this.postEmpty(`/rooms/${encodeURIComponent(id)}/leave`, signal); }
+
+  async members(id: string, offset: number, signal: AbortSignal): Promise<RoomMember[]> {
+    const result = await this.get<unknown>(`/rooms/${encodeURIComponent(id)}/members?${new URLSearchParams({ limit: '50', offset: String(offset) })}`, signal);
+    if (!Array.isArray(result) || !result.every((item: unknown) => {
+      if (!item || typeof item !== 'object') return false;
+      const member = item as RoomMember;
+      return typeof member.user_id === 'string' && !!member.user_id && typeof member.joined_at === 'string' && Number.isFinite(Date.parse(member.joined_at));
+    })) throw new ApiError(502, 'Could not read room members.');
+    return result;
   }
 
   async listRooms(options: { limit?: number; offset?: number; signal?: AbortSignal } = {}): Promise<Room[]> {

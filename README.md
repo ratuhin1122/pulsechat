@@ -1,5 +1,7 @@
 # PulseChat
 
+For local development, start Docker Desktop and run `make start`, then open **http://localhost:8080**. Your root `.env` is loaded automatically. Use `make stop`, `make logs`, and `make ps` to manage it. See [deployment instructions](deploy/README.md) for local HTTP and production HTTPS details.
+
 PulseChat is a high-performance, secure real-time messaging platform built with Go, PostgreSQL, Redis, and modern web technologies. Engineered with a security-first mindset, PulseChat features an asynchronous, sandboxed file upload pipeline that isolates untrusted uploads, scans for malware via ClamAV, strips metadata and transcodes images using libvips, and broadcasts real-time updates through WebSockets.
 
 ---

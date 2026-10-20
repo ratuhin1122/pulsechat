@@ -15,6 +15,20 @@ jobs:
   go:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pulsechat_test
+          POSTGRES_PASSWORD: pulsechat_test
+          POSTGRES_DB: pulsechat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U pulsechat_test -d pulsechat_test"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      PULSECHAT_TEST_DATABASE_URL: postgres://pulsechat_test:pulsechat_test@localhost:5432/pulsechat_test?sslmode=disable
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6

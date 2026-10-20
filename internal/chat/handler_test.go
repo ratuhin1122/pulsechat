@@ -31,6 +31,14 @@ type fakeRepository struct {
 	attachments func(context.Context, pgtype.UUID) ([]db.Attachment, error)
 }
 
+func (f *fakeRepository) GetUser(_ context.Context, id pgtype.UUID) (db.User, error) {
+	return db.User{ID: id, Username: "peer"}, nil
+}
+
+func (f *fakeRepository) ListDirectRoomPeers(_ context.Context, _ db.ListDirectRoomPeersParams) ([]db.ListDirectRoomPeersRow, error) {
+	return nil, nil
+}
+
 func (f *fakeRepository) ListAttachmentsForMessage(ctx context.Context, id pgtype.UUID) ([]db.Attachment, error) {
 	if f.attachments != nil {
 		return f.attachments(ctx, id)
@@ -38,8 +46,12 @@ func (f *fakeRepository) ListAttachmentsForMessage(ctx context.Context, id pgtyp
 	return nil, nil
 }
 
-func (f *fakeRepository) CreateGroupRoom(ctx context.Context, name string, id pgtype.UUID) (db.Room, error) {
+func (f *fakeRepository) CreateGroupRoom(ctx context.Context, name string, id pgtype.UUID, _ bool) (db.Room, error) {
 	return f.create(ctx, name, id)
+}
+
+func (f *fakeRepository) ListRoomSummaries(context.Context, db.ListRoomSummariesParams) ([]db.ListRoomSummariesRow, error) {
+	return nil, nil
 }
 func (f *fakeRepository) GetOrCreateDirectRoom(ctx context.Context, user, peer pgtype.UUID) (db.Room, error) {
 	return f.direct(ctx, user, peer)
@@ -72,7 +84,7 @@ func testUUID(t *testing.T, value string) pgtype.UUID {
 	return id
 }
 
-func testRoutes(t *testing.T, repo Repository) (*http.ServeMux, string) {
+func testRoutes(t *testing.T, repo Repository, publishers ...ReadPublisher) (*http.ServeMux, string) {
 	t.Helper()
 	tokens, err := auth.NewTokens(strings.Repeat("a", 32))
 	if err != nil {
@@ -83,7 +95,11 @@ func testRoutes(t *testing.T, repo Repository) (*http.ServeMux, string) {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	New(repo, slog.New(slog.NewTextHandler(io.Discard, nil))).RegisterRoutes(mux, tokens)
+	handler := New(repo, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if len(publishers) > 0 {
+		handler.WithReadPublisher(publishers[0])
+	}
+	handler.RegisterRoutes(mux, tokens)
 	return mux, raw
 }
 

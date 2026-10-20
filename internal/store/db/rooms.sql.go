@@ -12,22 +12,24 @@ import (
 )
 
 const createRoom = `-- name: CreateRoom :one
-INSERT INTO rooms (type, name) VALUES ($1, $2) RETURNING id, type, name, created_at
+INSERT INTO rooms (type, name, is_public) VALUES ($1, $2, $3) RETURNING id, type, name, created_at, is_public
 `
 
 type CreateRoomParams struct {
-	Type string
-	Name string
+	Type     string
+	Name     string
+	IsPublic bool
 }
 
 func (q *Queries) CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error) {
-	row := q.db.QueryRow(ctx, createRoom, arg.Type, arg.Name)
+	row := q.db.QueryRow(ctx, createRoom, arg.Type, arg.Name, arg.IsPublic)
 	var i Room
 	err := row.Scan(
 		&i.ID,
 		&i.Type,
 		&i.Name,
 		&i.CreatedAt,
+		&i.IsPublic,
 	)
 	return i, err
 }
@@ -45,7 +47,7 @@ func (q *Queries) DeleteRoom(ctx context.Context, id pgtype.UUID) (int64, error)
 }
 
 const getRoom = `-- name: GetRoom :one
-SELECT id, type, name, created_at FROM rooms WHERE id = $1
+SELECT id, type, name, created_at, is_public FROM rooms WHERE id = $1
 `
 
 func (q *Queries) GetRoom(ctx context.Context, id pgtype.UUID) (Room, error) {
@@ -56,12 +58,13 @@ func (q *Queries) GetRoom(ctx context.Context, id pgtype.UUID) (Room, error) {
 		&i.Type,
 		&i.Name,
 		&i.CreatedAt,
+		&i.IsPublic,
 	)
 	return i, err
 }
 
 const listRoomsForUser = `-- name: ListRoomsForUser :many
-SELECT r.id, r.type, r.name, r.created_at FROM rooms r
+SELECT r.id, r.type, r.name, r.created_at, r.is_public FROM rooms r
 JOIN room_members m ON m.room_id = r.id
 WHERE m.user_id = $1 ORDER BY r.created_at, r.id LIMIT $2 OFFSET $3
 `
@@ -86,6 +89,7 @@ func (q *Queries) ListRoomsForUser(ctx context.Context, arg ListRoomsForUserPara
 			&i.Type,
 			&i.Name,
 			&i.CreatedAt,
+			&i.IsPublic,
 		); err != nil {
 			return nil, err
 		}
@@ -98,7 +102,7 @@ func (q *Queries) ListRoomsForUser(ctx context.Context, arg ListRoomsForUserPara
 }
 
 const updateRoom = `-- name: UpdateRoom :one
-UPDATE rooms SET name = $2 WHERE id = $1 RETURNING id, type, name, created_at
+UPDATE rooms SET name = $2 WHERE id = $1 RETURNING id, type, name, created_at, is_public
 `
 
 type UpdateRoomParams struct {
@@ -114,6 +118,7 @@ func (q *Queries) UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, e
 		&i.Type,
 		&i.Name,
 		&i.CreatedAt,
+		&i.IsPublic,
 	)
 	return i, err
 }

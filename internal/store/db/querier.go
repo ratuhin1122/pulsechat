@@ -40,20 +40,26 @@ type Querier interface {
 	JoinGroupRoom(ctx context.Context, arg JoinGroupRoomParams) (int64, error)
 	LinkAttachmentMessage(ctx context.Context, arg LinkAttachmentMessageParams) error
 	ListAttachmentsForMessage(ctx context.Context, messageID pgtype.UUID) ([]Attachment, error)
+	ListDirectRoomPeers(ctx context.Context, arg ListDirectRoomPeersParams) ([]ListDirectRoomPeersRow, error)
 	ListMessages(ctx context.Context, arg ListMessagesParams) ([]Message, error)
+	ListPublicRooms(ctx context.Context, arg ListPublicRoomsParams) ([]Room, error)
 	ListReplayMessages(ctx context.Context, arg ListReplayMessagesParams) ([]Message, error)
 	ListRoomHistory(ctx context.Context, arg ListRoomHistoryParams) ([]Message, error)
 	ListRoomMemberIDs(ctx context.Context, roomID pgtype.UUID) ([]pgtype.UUID, error)
 	ListRoomMembers(ctx context.Context, arg ListRoomMembersParams) ([]RoomMember, error)
+	ListRoomSummaries(ctx context.Context, arg ListRoomSummariesParams) ([]ListRoomSummariesRow, error)
 	ListRoomsForUser(ctx context.Context, arg ListRoomsForUserParams) ([]Room, error)
 	ListUserRoomIDs(ctx context.Context, userID pgtype.UUID) ([]pgtype.UUID, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockDirectRoomPair(ctx context.Context, pairKey string) error
+	LockRoomMember(ctx context.Context, arg LockRoomMemberParams) (RoomMember, error)
 	MarkAttachmentNotified(ctx context.Context, id pgtype.UUID) error
 	MarkAttachmentReady(ctx context.Context, id pgtype.UUID) (int64, error)
 	RejectAttachment(ctx context.Context, arg RejectAttachmentParams) (int64, error)
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) (int64, error)
 	RotateRefreshToken(ctx context.Context, arg RotateRefreshTokenParams) (pgtype.UUID, error)
+	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
+	SetRoomReadMarker(ctx context.Context, arg SetRoomReadMarkerParams) error
 	UpdateAttachment(ctx context.Context, arg UpdateAttachmentParams) (Attachment, error)
 	UpdateMessage(ctx context.Context, arg UpdateMessageParams) (Message, error)
 	UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, error)

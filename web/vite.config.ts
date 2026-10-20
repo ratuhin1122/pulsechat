@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       https: {},
       proxy: Object.fromEntries(
-        ['/auth', '/rooms', '/files', '/presence', '/ws'].map((path) => [
+        ['/auth', '/rooms', '/users', '/files', '/presence', '/ws'].map((path) => [
           path, { target, changeOrigin: true, ws: path === '/ws' },
         ]),
       ),

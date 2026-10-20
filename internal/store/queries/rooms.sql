@@ -1,5 +1,5 @@
 -- name: CreateRoom :one
-INSERT INTO rooms (type, name) VALUES ($1, $2) RETURNING *;
+INSERT INTO rooms (type, name, is_public) VALUES ($1, $2, $3) RETURNING *;
 
 -- name: GetRoom :one
 SELECT * FROM rooms WHERE id = $1;

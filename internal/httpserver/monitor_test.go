@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"pulsechat/internal/metrics"
 )
 
 func TestMonitor(t *testing.T) {
@@ -69,7 +71,7 @@ func TestMonitorWebSocketUpgrade(t *testing.T) {
 			t.Errorf("write: %v", err)
 		}
 	})
-	server := httptest.NewServer(m.Wrap(mux, mux))
+	server := httptest.NewServer(metrics.New().Middleware(mux, m.Wrap(mux, mux)))
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

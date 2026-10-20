@@ -13,8 +13,8 @@ func TestLoad(t *testing.T) {
 		want    Config
 		wantErr bool
 	}{
-		{name: "defaults", want: Config{HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}},
-		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second, StorageDir: "data"}},
+		{name: "defaults", want: Config{MetricsAddr: "127.0.0.1:9090", HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}},
+		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{MetricsAddr: "127.0.0.1:9090", HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second, StorageDir: "data"}},
 		{name: "invalid timeout", timeout: "invalid", wantErr: true},
 		{name: "zero timeout", timeout: "0s", wantErr: true},
 		{name: "negative timeout", timeout: "-1s", wantErr: true},
@@ -24,11 +24,13 @@ func TestLoad(t *testing.T) {
 			t.Setenv("DATABASE_URL", "")
 			t.Setenv("JWT_SECRET", "")
 			t.Setenv("WS_ORIGIN", "")
+			t.Setenv("DEV_HTTP", "")
 			t.Setenv("TRUSTED_PROXY_CIDRS", "")
 			t.Setenv("REDIS_URL", "")
 			t.Setenv("STORAGE_DIR", "")
 			t.Setenv("CLAMD_ADDR", "")
 			t.Setenv("INSPECT_ARCHIVES", "")
+			t.Setenv("METRICS_ADDR", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()
@@ -81,6 +83,19 @@ func TestArchiveInspectionConfig(t *testing.T) {
 			cfg, err := Load()
 			if (err != nil) != tt.bad || err == nil && cfg.InspectArchives != tt.enabled {
 				t.Fatalf("config=%+v,error=%v", cfg, err)
+			}
+		})
+	}
+}
+
+func TestMetricsAddr(t *testing.T) {
+	t.Setenv("SHUTDOWN_TIMEOUT", "")
+	for _, tt := range []struct{ value, want string }{{"", "127.0.0.1:9090"}, {":9100", ":9100"}} {
+		t.Run(tt.want, func(t *testing.T) {
+			t.Setenv("METRICS_ADDR", tt.value)
+			cfg, err := Load()
+			if err != nil || cfg.MetricsAddr != tt.want {
+				t.Fatalf("metrics addr=%q,error=%v", cfg.MetricsAddr, err)
 			}
 		})
 	}

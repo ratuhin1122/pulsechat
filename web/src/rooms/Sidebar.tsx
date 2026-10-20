@@ -4,15 +4,18 @@ import { errorMessage } from '../api/http';
 import { useAuth } from '../auth/AuthProvider';
 import { Brand } from '../components/Brand';
 import { Icon } from '../components/Icon';
-import { useRooms } from './useRooms';
+import type { useRooms } from './useRooms';
+import { RoomActions } from './RoomActions';
 
 export function roomName(room: Room) {
   return room.name || (room.type === 'dm' ? `Direct message · ${room.id.slice(0, 8)}` : 'Untitled room');
 }
 
-export function Sidebar({ open, selected, onSelect }: { open: boolean; selected: Room | null; onSelect: (room: Room) => void }) {
+export function Sidebar({ open, selected, onSelect, store }: {
+  open: boolean; selected: Room | null; onSelect: (room: Room) => void; store: ReturnType<typeof useRooms>;
+}) {
   const { api, session } = useAuth();
-  const { rooms, loading, error, more, retry, reload, loadMore } = useRooms(api);
+  const { rooms, loading, error, more, retry, reload, loadMore, addRoom } = store;
   const [search, setSearch] = useState('');
   const [signingOut, setSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
@@ -32,21 +35,27 @@ export function Sidebar({ open, selected, onSelect }: { open: boolean; selected:
         <Icon name="refresh" />
       </button>
     </div>
+    <RoomActions api={api} rooms={rooms} disabled={loading} onCreated={(room) => { addRoom(room); setSearch(''); onSelect(room); }} />
     <label className="room-search"><Icon name="search" /><span className="sr-only">Find a room</span>
       <input type="search" placeholder="Find a room" value={search} onChange={(event) => setSearch(event.target.value)} />
     </label>
     <nav className="room-list" aria-label="Room list" aria-busy={loading}>
-      {filtered.map((room) => <button className={`room-button${room.id === selected?.id ? ' is-selected' : ''}`}
+      {(['dm', 'group'] as const).map((kind) => <section className="conversation-section" key={kind} aria-label={kind === 'dm' ? 'Direct messages' : 'Group rooms'}>
+      <h3>{kind === 'dm' ? 'Direct messages' : 'Group rooms'}</h3>
+      {filtered.filter((room) => room.type === kind).map((room) => <button className={`room-button${room.id === selected?.id ? ' is-selected' : ''}`}
         type="button" key={room.id} aria-label={`${roomName(room)}, ${room.type === 'group' ? 'Group room' : 'Direct conversation'}`}
         aria-pressed={room.id === selected?.id} onClick={() => onSelect(room)}>
         <span className={`room-avatar ${room.type}`}><Icon name={room.type === 'group' ? 'hash' : 'message'} /></span>
         <span className="room-details"><span className="room-name">{roomName(room)}</span>
-          <span className="room-kind">{room.type === 'group' ? 'Group room' : 'Direct conversation'}</span>
+          <span className="room-kind room-preview">{room.last_message ? room.last_message.body || `${room.last_message.type} attachment` : room.type === 'group' ? 'Group room' : 'Direct conversation'}</span>
         </span>
+        {!!room.unread_count && <span className="unread-badge" aria-label={`${room.unread_count} unread messages`}>{room.unread_count > 99 ? '99+' : room.unread_count}</span>}
       </button>)}
+      {!loading && !search && !rooms.some((room) => room.type === kind) && <p className="sidebar-note">{kind === 'dm' ? 'Start a message to someone.' : 'Create a group for your people.'}</p>}
+      </section>)}
       {loading && <p className="sidebar-note" role="status">{rooms.length ? 'Updating rooms…' : 'Loading your rooms…'}</p>}
       {error && <div className="sidebar-error"><p role="alert">{error}</p><button className="text-button" onClick={retry}>Try again</button></div>}
-      {!loading && !error && !rooms.length && <div className="sidebar-empty"><Icon name="rooms" /><h3>No rooms yet</h3><p>Rooms you join will appear here.</p></div>}
+      {!loading && !error && !rooms.length && <div className="sidebar-empty"><Icon name="rooms" /><h3>No rooms yet</h3><p>Use New chat to find people or join a room.</p></div>}
       {!loading && rooms.length > 0 && !filtered.length && <p className="sidebar-note">No rooms match “{search}”.</p>}
       {more && !error && <button className="load-more text-button" disabled={loading} onClick={loadMore}>Load more rooms</button>}
     </nav>

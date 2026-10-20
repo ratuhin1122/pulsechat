@@ -17,7 +17,13 @@ import (
 
 type Repository interface {
 	MembershipReader
-	CreateGroupRoom(context.Context, string, pgtype.UUID) (db.Room, error)
+	SearchUsers(context.Context, db.SearchUsersParams) ([]db.SearchUsersRow, error)
+	GetUser(context.Context, pgtype.UUID) (db.User, error)
+	ListDirectRoomPeers(context.Context, db.ListDirectRoomPeersParams) ([]db.ListDirectRoomPeersRow, error)
+	CreateGroupRoom(context.Context, string, pgtype.UUID, bool) (db.Room, error)
+	ListPublicRooms(context.Context, db.ListPublicRoomsParams) ([]db.Room, error)
+	ListRoomSummaries(context.Context, db.ListRoomSummariesParams) ([]db.ListRoomSummariesRow, error)
+	MarkRoomRead(context.Context, db.SetRoomReadMarkerParams) (pgtype.UUID, error)
 	GetOrCreateDirectRoom(context.Context, pgtype.UUID, pgtype.UUID) (db.Room, error)
 	GetRoom(context.Context, pgtype.UUID) (db.Room, error)
 	JoinGroupRoom(context.Context, db.JoinGroupRoomParams) (int64, error)
@@ -32,13 +38,23 @@ type Repository interface {
 type Handler struct {
 	repo   Repository
 	logger *slog.Logger
+	reads  ReadPublisher
 }
+
+type ReadPublisher interface {
+	PublishRead(context.Context, pgtype.UUID, pgtype.UUID, pgtype.UUID) error
+}
+
+func (h *Handler) WithReadPublisher(p ReadPublisher) *Handler { h.reads = p; return h }
 
 func New(repo Repository, logger *slog.Logger) *Handler {
 	return &Handler{repo: repo, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, tokens *auth.Tokens) {
+	mux.Handle("GET /users", tokens.Middleware(http.HandlerFunc(h.searchUsers)))
+	mux.HandleFunc("GET /rooms/public", h.publicRooms)
+	mux.Handle("POST /rooms/{roomID}/read", tokens.Middleware(http.HandlerFunc(h.markRead)))
 	mux.Handle("POST /rooms", tokens.Middleware(http.HandlerFunc(h.createGroup)))
 	mux.Handle("POST /rooms/{roomID}/join", tokens.Middleware(http.HandlerFunc(h.join)))
 	mux.Handle("POST /rooms/{roomID}/leave", tokens.Middleware(http.HandlerFunc(h.leave)))

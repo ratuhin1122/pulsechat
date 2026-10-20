@@ -12,7 +12,7 @@ import (
 )
 
 const findDirectRoom = `-- name: FindDirectRoom :one
-SELECT r.id, r.type, r.name, r.created_at FROM rooms r
+SELECT r.id, r.type, r.name, r.created_at, r.is_public FROM rooms r
 JOIN room_members first_member ON first_member.room_id = r.id
 JOIN room_members second_member ON second_member.room_id = r.id
 WHERE r.type = 'dm'
@@ -36,6 +36,7 @@ func (q *Queries) FindDirectRoom(ctx context.Context, arg FindDirectRoomParams) 
 		&i.Type,
 		&i.Name,
 		&i.CreatedAt,
+		&i.IsPublic,
 	)
 	return i, err
 }

@@ -29,6 +29,9 @@ it('previews a picked image, reports upload progress, waits for ready, and revok
   expect((screen.getByRole('progressbar') as HTMLProgressElement).value).toBe(45);
   await act(async () => complete({ id: 'a1', kind: 'image', status: 'pending' }));
   expect(screen.getByText(/Processing…/)).toBeTruthy(); expect(screen.queryByText('Ready · sent')).toBeNull();
+  view.rerender(<Harness statuses={{ a1: 'rejected' }} />);
+  expect(screen.getByText('Rejected by file validation').closest('.upload-draft')?.getAttribute('data-state')).toBe('rejected');
+  expect(screen.queryByRole('button', { name: 'Send attachment' })).toBeNull();
   view.rerender(<Harness statuses={{ a1: 'ready' }} />); expect(screen.getByText('Ready · sent')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss photo.png' })); expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
 });

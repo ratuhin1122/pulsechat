@@ -1,0 +1,17 @@
+# Explicit loopback-only HTTP mode. Paths resolve from the root compose file.
+services:
+  caddy:
+    ports: !override
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./deploy/Caddyfile.local:/etc/caddy/Caddyfile:ro
+  api:
+    environment:
+      DEV_HTTP: "true"
+      WS_ORIGIN: "http://localhost:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

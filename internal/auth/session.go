@@ -31,9 +31,16 @@ func refreshHash(raw string) []byte {
 	return hash[:]
 }
 
-func refreshCookie(raw string, expires time.Time, maxAge int) *http.Cookie {
-	return &http.Cookie{Name: "__Secure-pulsechat_refresh", Value: raw, Path: "/auth",
-		HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode,
+func (h *Handler) cookieName() string {
+	if h.localHTTP {
+		return "pulsechat_refresh_dev"
+	}
+	return "__Secure-pulsechat_refresh"
+}
+
+func (h *Handler) refreshCookie(raw string, expires time.Time, maxAge int) *http.Cookie {
+	return &http.Cookie{Name: h.cookieName(), Value: raw, Path: "/auth",
+		HttpOnly: true, Secure: !h.localHTTP, SameSite: http.SameSiteStrictMode,
 		Expires: expires, MaxAge: maxAge}
 }
 
@@ -62,7 +69,7 @@ func (h *Handler) startSession(w http.ResponseWriter, r *http.Request, id pgtype
 func (h *Handler) respond(w http.ResponseWriter, r *http.Request, access, refresh string, expires time.Time, status int) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
-	http.SetCookie(w, refreshCookie(refresh, expires, int(refreshTTL.Seconds())))
+	http.SetCookie(w, h.refreshCookie(refresh, expires, int(refreshTTL.Seconds())))
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(struct {
 		AccessToken string `json:"access_token"`
@@ -74,7 +81,7 @@ func (h *Handler) respond(w http.ResponseWriter, r *http.Request, access, refres
 }
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("__Secure-pulsechat_refresh")
+	cookie, err := r.Cookie(h.cookieName())
 	if err != nil || len(cookie.Value) != 43 {
 		http.Error(w, "invalid refresh token", http.StatusUnauthorized)
 		return
@@ -105,13 +112,13 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie("__Secure-pulsechat_refresh"); err == nil {
+	if cookie, err := r.Cookie(h.cookieName()); err == nil {
 		if err := h.repo.DeleteRefreshToken(r.Context(), refreshHash(cookie.Value)); err != nil {
 			h.fail(w, r, err)
 			return
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	http.SetCookie(w, refreshCookie("", time.Unix(1, 0), -1))
+	http.SetCookie(w, h.refreshCookie("", time.Unix(1, 0), -1))
 	w.WriteHeader(http.StatusNoContent)
 }

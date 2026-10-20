@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/coder/websocket"
@@ -42,6 +43,9 @@ func ping(ctx context.Context, conn socketWriter) error {
 
 func (h *Handler) heartbeat(ctx context.Context, conn socketWriter, c *client) error {
 	if err := ping(ctx, conn); err != nil {
+		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			c.disconnect.Store(2)
+		}
 		return err
 	}
 	refreshCtx, cancel := context.WithTimeout(ctx, 5*time.Second)

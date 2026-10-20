@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"pulsechat/internal/chat"
 	"pulsechat/internal/config"
 	"pulsechat/internal/httpserver"
+	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
 	"pulsechat/internal/upload"
@@ -38,7 +38,8 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	monitor, err := httpserver.NewMonitor(logger)
+	meter := metrics.New()
+	monitor, err := httpserver.NewMonitor(logger, meter.Registry)
 	if err != nil {
 		return err
 	}
@@ -55,7 +56,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer database.Close()
-	websocketHandler, closeRealtime, err := newRealtime(ctx, cfg, database, tokens, logger)
+	websocketHandler, closeRealtime, err := newRealtime(ctx, cfg, database, tokens, logger, meter)
 	if err != nil {
 		return err
 	}
@@ -76,11 +77,10 @@ func run(logger *slog.Logger) error {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /metrics", monitor.Handler())
-	auth.New(database, tokens, logger).RegisterRoutes(mux)
-	chat.New(database, logger).RegisterRoutes(mux, tokens)
+	auth.NewWithOptions(database, tokens, logger, auth.Options{LocalHTTP: cfg.DevHTTP}).RegisterRoutes(mux)
+	chat.New(database, logger).WithReadPublisher(websocketHandler).RegisterRoutes(mux, tokens)
 	websocketHandler.RegisterRoutes(mux)
-	upload.New(database, disk, uploadLimiter, attachmentQueue, logger).RegisterRoutes(mux, tokens)
+	upload.New(database, disk, uploadLimiter, attachmentQueue, logger).WithMetrics(meter).RegisterRoutes(mux, tokens)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if _, err := w.Write([]byte("ok\n")); err != nil {
@@ -89,29 +89,13 @@ func run(logger *slog.Logger) error {
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           monitor.Wrap(mux, limits.Wrap(mux)),
+		Handler:           meter.Middleware(mux, monitor.Wrap(mux, limits.Wrap(mux))),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	serveErr := make(chan error, 1)
-	go func() { serveErr <- server.ListenAndServe() }()
-	logger.InfoContext(ctx, "api starting", "addr", cfg.HTTPAddr)
-
-	select {
-	case err := <-serveErr:
-		return fmt.Errorf("serve http: %w", err)
-	case <-ctx.Done():
-	}
-	stop()
-	logger.Info("api shutting down")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-	defer cancel()
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		closeErr := server.Close()
-		return fmt.Errorf("shutdown http: %w", errors.Join(err, closeErr))
-	}
-	if err := <-serveErr; !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("serve http: %w", err)
-	}
-	return nil
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("GET /metrics", monitor.Handler())
+	internal := &http.Server{Addr: cfg.MetricsAddr, Handler: metricsMux, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
+	logger.InfoContext(ctx, "api starting", "addr", cfg.HTTPAddr, "metrics_addr", cfg.MetricsAddr)
+	return serve(ctx, cfg.ShutdownTimeout, server, internal)
 }

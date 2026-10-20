@@ -1,5 +1,19 @@
 # HTTPS deployment
 
+## Local HTTP development
+
+Start Docker Desktop first. With your existing root `.env`, run `make start` from the repository root, then open **http://localhost:8080**. This builds the frontend and Go services, starts PostgreSQL/Redis/ClamAV, applies pending migrations with golang-migrate, and starts the API, worker, and Caddy. The first run may take several minutes while images build and ClamAV loads.
+
+`make stop` stops containers without deleting data, `make logs` follows logs, `make ps` shows status, and `make migrate` applies pending migrations. Run `make` for help. GNU Make and Docker Compose 2.24.4+ are required (the local override replaces HTTPS port mappings).
+
+Local mode binds only `127.0.0.1:8080`, disables automatic HTTPS in Caddy, sets the WebSocket Origin to `http://localhost:8080`, and uses a separate HttpOnly/SameSite development refresh cookie without Secure. `DEV_HTTP` defaults to false and requires an explicit loopback HTTP origin. Use the exact localhost URL above. No changes to `.env` are needed. Production retains HTTPS and its Secure cookie.
+
+If you previously applied SQL files manually rather than using golang-migrate, establish the correct existing migration version before running `make start`; never force a version without verifying the schema. Do not delete database volumes to resolve a migration error.
+
+## Production HTTPS
+
+`make prod-start` applies pending migrations and starts the production stack; `make prod-stop` stops it without deleting volumes. Alternatively, use the Compose commands below and apply migrations separately.
+
 Set `DOMAIN` to a public hostname (without a scheme or path), `ACME_EMAIL` to your certificate contact email, and `JWT_SECRET` to a random secret of at least 32 bytes. Point the hostname's DNS records at this host and allow inbound TCP 80/443 (and UDP 443 for HTTP/3).
 
 ```sh
@@ -17,3 +31,7 @@ Caddy writes JSON access logs to stdout, redacting access-token query parameters
 Prometheus can scrape `http://api:8080/metrics` from the Compose network. Caddy blocks public `/metrics`. Metrics include Go/process collectors, HTTP counts/statuses, durations, and in-flight requests. Labels use registered route patterns and bounded methods. WebSocket counts complete on disconnect; active WebSockets are included in the in-flight gauge. No monitoring service is added.
 
 GitHub Actions vets, lints, and runs race tests with the `libvips` build tag and system libvips/ffmpeg installed, then builds both the API/worker image and Caddy/frontend image. Image builds are local to CI and are not pushed or deployed. The Caddy image is also checked with `caddy validate`.
+
+Metrics use a separate API listener: `METRICS_ADDR` defaults to `127.0.0.1:9090` for local processes. Compose sets `:9090` inside the API container, without a host port mapping; scrape `http://api:9090/metrics` from the private Compose network. The public API does not register `/metrics`, and Caddy does not proxy this listener. HTTP duration labels contain ServeMux patterns (or `unmatched`), never request paths or queries.
+
+WebSocket gauges count this API instance's connections and distinct connected users. Disconnect reasons are bounded to `heartbeat_timeout`, `client_close`, and `error` (including eviction/shutdown). `chat_messages_total` counts live message events once per receiving API hub, including attachment messages, excluding replay and recipient fan-out; with Redis, each subscribed API counts its copy, so do not sum this metric as a cluster-wide persisted-message count. `uploads_total{result="accepted"}` counts persisted pending uploads even if enqueueing subsequently fails; `rejected_stage1` counts invalid multipart/file validation failures, excluding authentication, membership, throttling and infrastructure errors.

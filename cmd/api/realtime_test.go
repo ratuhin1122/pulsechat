@@ -12,6 +12,7 @@ import (
 
 	"pulsechat/internal/auth"
 	"pulsechat/internal/config"
+	"pulsechat/internal/metrics"
 )
 
 func TestRealtimeSelection(t *testing.T) {
@@ -34,7 +35,7 @@ func TestRealtimeSelection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			handler, cleanup, err := newRealtime(ctx, config.Config{RedisURL: tt.url}, nil, tokens, slog.New(slog.NewTextHandler(io.Discard, nil)))
+			handler, cleanup, err := newRealtime(ctx, config.Config{RedisURL: tt.url}, nil, tokens, slog.New(slog.NewTextHandler(io.Discard, nil)), metrics.New())
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("newRealtime() error = %v", err)
 			}

@@ -12,7 +12,7 @@ import (
 )
 
 const addRoomMember = `-- name: AddRoomMember :one
-INSERT INTO room_members (room_id, user_id) VALUES ($1, $2) RETURNING room_id, user_id, joined_at
+INSERT INTO room_members (room_id, user_id) VALUES ($1, $2) RETURNING room_id, user_id, joined_at, last_read_message_id
 `
 
 type AddRoomMemberParams struct {
@@ -23,12 +23,17 @@ type AddRoomMemberParams struct {
 func (q *Queries) AddRoomMember(ctx context.Context, arg AddRoomMemberParams) (RoomMember, error) {
 	row := q.db.QueryRow(ctx, addRoomMember, arg.RoomID, arg.UserID)
 	var i RoomMember
-	err := row.Scan(&i.RoomID, &i.UserID, &i.JoinedAt)
+	err := row.Scan(
+		&i.RoomID,
+		&i.UserID,
+		&i.JoinedAt,
+		&i.LastReadMessageID,
+	)
 	return i, err
 }
 
 const getRoomMember = `-- name: GetRoomMember :one
-SELECT room_id, user_id, joined_at FROM room_members WHERE room_id = $1 AND user_id = $2
+SELECT room_id, user_id, joined_at, last_read_message_id FROM room_members WHERE room_id = $1 AND user_id = $2
 `
 
 type GetRoomMemberParams struct {
@@ -39,12 +44,17 @@ type GetRoomMemberParams struct {
 func (q *Queries) GetRoomMember(ctx context.Context, arg GetRoomMemberParams) (RoomMember, error) {
 	row := q.db.QueryRow(ctx, getRoomMember, arg.RoomID, arg.UserID)
 	var i RoomMember
-	err := row.Scan(&i.RoomID, &i.UserID, &i.JoinedAt)
+	err := row.Scan(
+		&i.RoomID,
+		&i.UserID,
+		&i.JoinedAt,
+		&i.LastReadMessageID,
+	)
 	return i, err
 }
 
 const listRoomMembers = `-- name: ListRoomMembers :many
-SELECT room_id, user_id, joined_at FROM room_members WHERE room_id = $1
+SELECT room_id, user_id, joined_at, last_read_message_id FROM room_members WHERE room_id = $1
 ORDER BY joined_at, user_id LIMIT $2 OFFSET $3
 `
 
@@ -63,7 +73,12 @@ func (q *Queries) ListRoomMembers(ctx context.Context, arg ListRoomMembersParams
 	items := []RoomMember{}
 	for rows.Next() {
 		var i RoomMember
-		if err := rows.Scan(&i.RoomID, &i.UserID, &i.JoinedAt); err != nil {
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.UserID,
+			&i.JoinedAt,
+			&i.LastReadMessageID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

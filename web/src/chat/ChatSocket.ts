@@ -18,6 +18,7 @@ export class ChatSocket {
   private cursor: Message | null = null;
   private replayAfterSeed = false;
   private refreshToken: string | undefined;
+  private hasConnected = false;
   private retry: ReturnType<typeof setTimeout> | undefined;
   private ping: ReturnType<typeof setInterval> | undefined;
   private pong: ReturnType<typeof setTimeout> | undefined;
@@ -72,7 +73,8 @@ export class ChatSocket {
     const generation = ++this.generation;
     this.handlers.status(this.attempts ? 'reconnecting' : 'connecting');
     try {
-      const token = this.refreshToken ? await this.session.refresh(this.refreshToken) : await this.session.getAccessToken();
+      const token = this.refreshToken ? await this.session.refresh(this.refreshToken) : this.hasConnected ? await this.session.refresh() : await this.session.getAccessToken();
+      this.hasConnected = true;
       this.refreshToken = undefined;
       if (this.stopped || generation !== this.generation) return;
       const url = new URL('/ws', this.options.origin ?? window.location.origin);

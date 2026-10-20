@@ -141,3 +141,25 @@ describe('typed protected API', () => {
     await expect(active).resolves.toEqual([]);
   });
 });
+
+it('sends a membership checked read marker with authorization', async () => {
+  const { session, api, fetcher } = setup(async (path, init) => {
+    if (path === '/auth/refresh') return token();
+    expect(path).toBe('/rooms/room%2F1/read'); expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ message_id: 'message-1' });
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access-token');
+    return new Response(null, { status: 204 });
+  });
+  await session.restore(); await api.markRead('room/1', 'message-1', new AbortController().signal);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('exposes identity labels without exposing the access token and clears them on logout', async () => {
+  const jwt = `header.${btoa(JSON.stringify({ sub: 'user-1', display_name: 'Alice Smith' }))}.signature`;
+  const { session } = setup(async (path) => path === '/auth/logout' ? new Response(null, { status: 204 }) : token(jwt));
+  await session.restore();
+  expect(session.getSnapshot()).toMatchObject({ userID: 'user-1', displayName: 'Alice Smith' });
+  expect(JSON.stringify(session.getSnapshot())).not.toContain(jwt);
+  await session.logout(); expect(session.getSnapshot().userID).toBeUndefined();
+  expect(session.getSnapshot().displayName).toBeUndefined();
+});
