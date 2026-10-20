@@ -53,6 +53,7 @@ func (h *AttachmentHandler) processImage(ctx context.Context, a db.Attachment) e
 	if updated == 0 {
 		return errors.Join(h.deleteClean(ctx, display.Name), h.deleteClean(ctx, thumb.Name))
 	}
+	h.processedBytes(display.Size + thumb.Size)
 	return h.deleteOriginal(ctx, a.StoredName)
 }
 

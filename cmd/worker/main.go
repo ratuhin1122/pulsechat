@@ -12,6 +12,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	"pulsechat/internal/config"
+	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
 	"pulsechat/internal/worker"
@@ -75,16 +76,12 @@ func run(logger *slog.Logger) error {
 			logger.ErrorContext(ctx, "attachment task failed", "type", task.Type(), "error", err)
 		}),
 	})
+	meter := metrics.NewWorker()
 	mux := asynq.NewServeMux()
-	handler := worker.NewAttachmentHandler(database, disk, scanner, logger, images)
+	handler := worker.NewAttachmentHandler(database, disk, scanner, logger, images).WithMetrics(meter)
 	handler.ConfigureMedia(worker.FFProbe{}, cfg.InspectArchives)
 	handler.ConfigureCompletion(database, ws.NewRedisPubSub(redis, logger))
 	mux.Handle(worker.ProcessAttachment, handler)
-	if err := server.Start(mux); err != nil {
-		return fmt.Errorf("start worker: %w", err)
-	}
-	defer server.Shutdown()
-	logger.InfoContext(ctx, "worker started")
-	<-ctx.Done()
-	return nil
+	inspector := asynq.NewInspectorFromRedisClient(redis)
+	return serveWorker(ctx, cfg, server, mux, inspector, meter, logger)
 }

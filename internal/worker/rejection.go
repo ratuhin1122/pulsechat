@@ -12,6 +12,12 @@ import (
 )
 
 func (h *AttachmentHandler) reject(ctx context.Context, attachment db.Attachment, reason string) error {
+	if stats, ok := ctx.Value(processingKey{}).(*processingStats); ok && stats.result != "error" {
+		stats.result = "rejected"
+		if strings.HasPrefix(reason, "malware detected:") {
+			stats.result = "infected"
+		}
+	}
 	// Record the denial even if the scan failed because the task timed out.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()

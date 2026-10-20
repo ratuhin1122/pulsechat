@@ -13,8 +13,8 @@ func TestLoad(t *testing.T) {
 		want    Config
 		wantErr bool
 	}{
-		{name: "defaults", want: Config{MetricsAddr: "127.0.0.1:9090", HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}},
-		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{MetricsAddr: "127.0.0.1:9090", HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second, StorageDir: "data"}},
+		{name: "defaults", want: Config{WorkerMetricsAddr: "127.0.0.1:9091", MetricsAddr: "127.0.0.1:9090", HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}},
+		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{WorkerMetricsAddr: "127.0.0.1:9091", MetricsAddr: "127.0.0.1:9090", HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second, StorageDir: "data"}},
 		{name: "invalid timeout", timeout: "invalid", wantErr: true},
 		{name: "zero timeout", timeout: "0s", wantErr: true},
 		{name: "negative timeout", timeout: "-1s", wantErr: true},
@@ -31,6 +31,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("CLAMD_ADDR", "")
 			t.Setenv("INSPECT_ARCHIVES", "")
 			t.Setenv("METRICS_ADDR", "")
+			t.Setenv("WORKER_METRICS_ADDR", "")
 			t.Setenv("HTTP_ADDR", tt.addr)
 			t.Setenv("SHUTDOWN_TIMEOUT", tt.timeout)
 			got, err := Load()
@@ -96,6 +97,19 @@ func TestMetricsAddr(t *testing.T) {
 			cfg, err := Load()
 			if err != nil || cfg.MetricsAddr != tt.want {
 				t.Fatalf("metrics addr=%q,error=%v", cfg.MetricsAddr, err)
+			}
+		})
+	}
+}
+
+func TestWorkerMetricsAddr(t *testing.T) {
+	t.Setenv("SHUTDOWN_TIMEOUT", "")
+	for _, tt := range []struct{ env, want string }{{"", "127.0.0.1:9091"}, {":9191", ":9191"}} {
+		t.Run(tt.want, func(t *testing.T) {
+			t.Setenv("WORKER_METRICS_ADDR", tt.env)
+			cfg, err := Load()
+			if err != nil || cfg.WorkerMetricsAddr != tt.want {
+				t.Fatalf("addr=%s,err=%v", cfg.WorkerMetricsAddr, err)
 			}
 		})
 	}

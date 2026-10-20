@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
 	"pulsechat/internal/ws"
@@ -25,6 +27,7 @@ type Repository interface {
 }
 
 type AttachmentHandler struct {
+	metrics         *metrics.Worker
 	repo            Repository
 	logger          *slog.Logger
 	storage         storage.Storage
@@ -45,7 +48,9 @@ func NewAttachmentHandler(repo Repository, disk storage.Storage, scanner Scanner
 	return h
 }
 
-func (h *AttachmentHandler) processTask(ctx context.Context, task *asynq.Task) error {
+func (h *AttachmentHandler) processTask(ctx context.Context, task *asynq.Task) (taskErr error) {
+	ctx, stats, observe := h.observeProcessing(ctx)
+	defer func() { observe(taskErr) }()
 	var payload attachmentPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("decode attachment task: %v: %w", err, asynq.SkipRetry)
@@ -61,25 +66,40 @@ func (h *AttachmentHandler) processTask(ctx context.Context, task *asynq.Task) e
 	if err != nil {
 		return fmt.Errorf("load attachment: %w", err)
 	}
+	switch attachment.Kind {
+	case "image", "document", "voice":
+		stats.kind = attachment.Kind
+	}
 	if attachment.Status == "ready" {
+		stats.skip = true
 		if attachment.QuarantineName.Valid {
 			return h.deleteOriginal(ctx, attachment.QuarantineName.String)
 		}
 		return nil
 	}
 	if attachment.Status == "rejected" {
+		stats.skip = true
 		return h.deleteRejected(ctx, attachment)
 	}
 	if attachment.Status != "pending" {
 		return fmt.Errorf("invalid attachment status %q: %w", attachment.Status, asynq.SkipRetry)
 	}
+	if h.metrics != nil && attachment.SizeBytes > 0 {
+		h.metrics.Bytes.WithLabelValues("original").Add(float64(attachment.SizeBytes))
+	}
 	file, err := h.storage.Open(ctx, storage.Quarantine, attachment.StoredName)
 	if err != nil {
+		setProcessingResult(ctx, "error")
 		return h.reject(ctx, attachment, "scan failed: open quarantine: "+err.Error())
 	}
+	scanStarted := time.Now()
 	result, scanErr := h.scanner.Scan(ctx, file)
+	if h.metrics != nil {
+		h.metrics.Scan.Observe(time.Since(scanStarted).Seconds())
+	}
 	closeErr := file.Close()
 	if err := errors.Join(scanErr, closeErr); err != nil {
+		setProcessingResult(ctx, "error")
 		return h.reject(ctx, attachment, "scan failed: "+err.Error())
 	}
 	if result.Threat != "" {

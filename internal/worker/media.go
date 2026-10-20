@@ -67,6 +67,7 @@ func (h *AttachmentHandler) processMedia(ctx context.Context, a db.Attachment) e
 	if updated == 0 {
 		return h.deleteClean(ctx, clean.Name)
 	}
+	h.processedBytes(clean.Size)
 	h.logger.InfoContext(ctx, "attachment processed", "attachment_id", a.ID.String(), "kind", a.Kind)
 	return h.deleteOriginal(ctx, a.StoredName)
 }

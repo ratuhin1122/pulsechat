@@ -20,11 +20,12 @@ type Config struct {
 	DatabaseURL       string
 	HTTPAddr          string
 	MetricsAddr       string
+	WorkerMetricsAddr string
 	ShutdownTimeout   time.Duration
 }
 
 func Load() (Config, error) {
-	cfg := Config{HTTPAddr: ":8080", MetricsAddr: "127.0.0.1:9090", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}
+	cfg := Config{HTTPAddr: ":8080", MetricsAddr: "127.0.0.1:9090", WorkerMetricsAddr: "127.0.0.1:9091", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}
 	if directory := os.Getenv("STORAGE_DIR"); directory != "" {
 		cfg.StorageDir = directory
 	}
@@ -54,6 +55,9 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("parse INSPECT_ARCHIVES: %w", err)
 		}
 		cfg.InspectArchives = enabled
+	}
+	if value := os.Getenv("WORKER_METRICS_ADDR"); value != "" {
+		cfg.WorkerMetricsAddr = value
 	}
 	if value := os.Getenv("METRICS_ADDR"); value != "" {
 		cfg.MetricsAddr = value
