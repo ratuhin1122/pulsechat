@@ -1,4 +1,5 @@
 {
+	metrics
 	email {$ACME_EMAIL}
 	# Upstream error logs may also contain a request URI.
 	log default {
@@ -38,7 +39,7 @@
 	}
 	encode zstd gzip
 
-	# Scrape api:8080/metrics on the Compose network, not through the public site.
+	# API and worker metrics use separate internal listeners.
 	@metrics path /metrics /metrics/*
 	handle @metrics {
 		respond 404
@@ -55,4 +56,10 @@
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+# Dedicated metrics listener; the admin API remains private to the container.
+http://:9180 {
+	metrics /metrics
+	respond 404
 }

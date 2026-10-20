@@ -1,4 +1,5 @@
 {
+	metrics
 	auto_https off
 	log default {
 		format filter {
@@ -50,4 +51,10 @@ http://localhost {
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+# Dedicated metrics listener; the admin API remains private to the container.
+http://:9180 {
+	metrics /metrics
+	respond 404
 }

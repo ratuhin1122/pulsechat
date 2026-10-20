@@ -3,6 +3,7 @@ services:
   caddy:
     ports: !override
       - "127.0.0.1:8080:80"
+      - "127.0.0.1:9180:9180"
     volumes:
       - ./deploy/Caddyfile.local:/etc/caddy/Caddyfile:ro
   api:
