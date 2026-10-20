@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"pulsechat/internal/logging"
 	"pulsechat/internal/store/db"
 )
 
@@ -45,6 +46,7 @@ func (h *Handler) refreshCookie(raw string, expires time.Time, maxAge int) *http
 }
 
 func (h *Handler) startSession(w http.ResponseWriter, r *http.Request, id pgtype.UUID, status int) {
+	logging.Set(r.Context(), logging.Fields{UserID: id.String()})
 	access, err := h.tokens.Issue(id.String())
 	if err != nil {
 		h.fail(w, r, err)
@@ -103,6 +105,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{UserID: id.String()})
 	access, err := h.tokens.Issue(id.String())
 	if err != nil {
 		h.fail(w, r, err)

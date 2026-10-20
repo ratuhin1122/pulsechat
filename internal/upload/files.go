@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"pulsechat/internal/auth"
 	"pulsechat/internal/chat"
+	"pulsechat/internal/logging"
 	"pulsechat/internal/storage"
 )
 
@@ -23,6 +24,7 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid file ID", http.StatusBadRequest)
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{AttachmentID: id.String()})
 	userID, _ := auth.UserID(r.Context())
 	if user.Scan(userID) != nil || !user.Valid {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -37,6 +39,7 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{RoomID: a.RoomID.String()})
 	if err := chat.RequireMembership(r.Context(), h.repo, a.RoomID, user); err != nil {
 		h.fail(w, r, err)
 		return

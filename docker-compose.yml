@@ -152,6 +152,35 @@ services:
       - prometheus_data:/prometheus
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
+  loki:
+    image: grafana/loki:3.7.8
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./deploy/loki/loki.yml:/etc/loki/loki.yml:ro
+
+  alloy:
+    image: grafana/alloy:v1.21.0
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      DOCKER_PROJECT_FILTER: "com.docker.compose.project=${COMPOSE_PROJECT_NAME:-pulsechat}"
+    ports:
+      - "127.0.0.1:12345:12345"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+      - ./deploy/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - loki
+
   grafana:
     image: grafana/grafana:13.2.4
     restart: unless-stopped
@@ -168,6 +197,7 @@ services:
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - loki
 
 volumes:
   caddy_data:
@@ -178,3 +208,5 @@ volumes:
   clamav_data:
   prometheus_data:
   grafana_data:
+  loki_data:
+  alloy_data:

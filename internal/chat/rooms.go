@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"pulsechat/internal/logging"
 	"pulsechat/internal/store/db"
 )
 
@@ -45,6 +46,7 @@ func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{RoomID: room.ID.String()})
 	h.respond(w, r, http.StatusCreated, roomView(room))
 }
 
@@ -70,6 +72,7 @@ func (h *Handler) direct(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{RoomID: room.ID.String()})
 	person, err := h.repo.GetUser(r.Context(), peer)
 	if err != nil {
 		h.fail(w, r, err)

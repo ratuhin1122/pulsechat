@@ -11,6 +11,7 @@ import (
 
 	"pulsechat/internal/auth"
 	"pulsechat/internal/chat"
+	"pulsechat/internal/logging"
 	"pulsechat/internal/store/db"
 )
 
@@ -74,6 +75,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{UserID: user.String()})
+	baseCtx := logging.WithFields(h.ctx, logging.From(r.Context()))
 	cursor, ok := h.replayCursor(w, r, user)
 	if !ok {
 		return
@@ -85,26 +88,26 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.CloseNow()
 	conn.SetReadLimit(MaxMessageSize)
 	c := newClient(user.String(), sendBuffer)
-	plan, err := h.registerForReplay(h.ctx, c, cursor, user)
+	plan, err := h.registerForReplay(baseCtx, c, cursor, user)
 	if err != nil {
-		h.logger.ErrorContext(h.ctx, "prepare websocket replay", "error", err)
+		h.logger.ErrorContext(baseCtx, "prepare websocket replay", "error", err)
 		conn.Close(websocket.StatusInternalError, "replay unavailable")
 		return
 	}
 	defer h.hub.unregister(c)
-	if err := h.changePresence(h.ctx, c, true); err != nil {
-		h.logger.ErrorContext(h.ctx, "connect presence", "error", err)
+	if err := h.changePresence(baseCtx, c, true); err != nil {
+		h.logger.ErrorContext(baseCtx, "connect presence", "error", err)
 		conn.Close(websocket.StatusInternalError, "presence unavailable")
 		return
 	}
 	defer func() {
 		// changePresence starts its timeout after acquiring the transition lock.
-		cleanupCtx := context.WithoutCancel(h.ctx)
+		cleanupCtx := context.WithoutCancel(baseCtx)
 		if err := h.changePresence(cleanupCtx, c, false); err != nil {
 			h.logger.ErrorContext(cleanupCtx, "disconnect presence", "error", err)
 		}
 	}()
-	ctx, cancel := context.WithCancel(h.ctx)
+	ctx, cancel := context.WithCancel(baseCtx)
 	defer cancel()
 	var loops sync.WaitGroup
 	loops.Add(2)

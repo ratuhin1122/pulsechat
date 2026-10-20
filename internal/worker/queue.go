@@ -10,6 +10,8 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
+
+	"pulsechat/internal/logging"
 )
 
 const (
@@ -20,6 +22,7 @@ const (
 
 type attachmentPayload struct {
 	AttachmentID string `json:"attachment_id"`
+	RequestID    string `json:"request_id,omitempty"`
 }
 
 type Queue struct {
@@ -60,11 +63,15 @@ func (q *Queue) Close() error {
 }
 
 func NewProcessAttachmentTask(attachmentID string) (*asynq.Task, error) {
+	return newProcessAttachmentTask(attachmentID, "")
+}
+
+func newProcessAttachmentTask(attachmentID, requestID string) (*asynq.Task, error) {
 	var id pgtype.UUID
 	if err := id.Scan(attachmentID); err != nil || !id.Valid {
 		return nil, fmt.Errorf("invalid attachment ID")
 	}
-	data, err := json.Marshal(attachmentPayload{AttachmentID: id.String()})
+	data, err := json.Marshal(attachmentPayload{AttachmentID: id.String(), RequestID: requestID})
 	if err != nil {
 		return nil, fmt.Errorf("encode attachment task: %w", err)
 	}
@@ -75,7 +82,7 @@ func (q *Queue) EnqueueAttachment(ctx context.Context, attachmentID string) erro
 	if q.client == nil {
 		return fmt.Errorf("REDIS_URL is required to enqueue attachments")
 	}
-	task, err := NewProcessAttachmentTask(attachmentID)
+	task, err := newProcessAttachmentTask(attachmentID, logging.From(ctx).RequestID)
 	if err != nil {
 		return err
 	}

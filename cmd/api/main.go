@@ -14,6 +14,7 @@ import (
 	"pulsechat/internal/chat"
 	"pulsechat/internal/config"
 	"pulsechat/internal/httpserver"
+	"pulsechat/internal/logging"
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
@@ -22,7 +23,7 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := logging.New(os.Stdout, "api")
 	if err := run(logger); err != nil {
 		logger.Error("api stopped", "error", err)
 		os.Exit(1)
@@ -89,13 +90,13 @@ func run(logger *slog.Logger) error {
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           meter.Middleware(mux, monitor.Wrap(mux, limits.Wrap(mux))),
+		Handler:           httpserver.RequestID(meter.Middleware(mux, monitor.Wrap(mux, limits.Wrap(mux)))),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 	metricsMux := http.NewServeMux()
 	metricsMux.Handle("GET /metrics", monitor.Handler())
-	internal := &http.Server{Addr: cfg.MetricsAddr, Handler: metricsMux, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
+	internal := &http.Server{Addr: cfg.MetricsAddr, Handler: httpserver.RequestID(metricsMux), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
 	logger.InfoContext(ctx, "api starting", "addr", cfg.HTTPAddr, "metrics_addr", cfg.MetricsAddr)
 	return serve(ctx, cfg.ShutdownTimeout, server, internal)
 }

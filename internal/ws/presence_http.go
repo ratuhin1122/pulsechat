@@ -9,6 +9,7 @@ import (
 
 	"pulsechat/internal/auth"
 	"pulsechat/internal/chat"
+	"pulsechat/internal/logging"
 )
 
 type presenceStatus struct {
@@ -23,6 +24,7 @@ func (h *Handler) listPresence(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "valid room_id is required", http.StatusBadRequest)
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{RoomID: room.String()})
 	userID, _ := auth.UserID(r.Context())
 	if err := user.Scan(userID); err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)

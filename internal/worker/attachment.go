@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"pulsechat/internal/logging"
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
@@ -66,6 +67,7 @@ func (h *AttachmentHandler) processTask(ctx context.Context, task *asynq.Task) (
 	if err != nil {
 		return fmt.Errorf("load attachment: %w", err)
 	}
+	logging.Set(ctx, logging.Fields{UserID: attachment.SenderID.String(), RoomID: attachment.RoomID.String(), AttachmentID: attachment.ID.String()})
 	switch attachment.Kind {
 	case "image", "document", "voice":
 		stats.kind = attachment.Kind

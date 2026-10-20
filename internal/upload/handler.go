@@ -15,6 +15,7 @@ import (
 
 	"pulsechat/internal/auth"
 	"pulsechat/internal/chat"
+	"pulsechat/internal/logging"
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
@@ -106,7 +107,9 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
+	logging.Set(r.Context(), logging.Fields{UserID: user.String(), RoomID: room.String(), AttachmentID: attachment.ID.String()})
 	committed = true
+	h.logger.InfoContext(r.Context(), "upload accepted", "kind", attachment.Kind)
 	if h.metrics != nil {
 		h.metrics.Uploads.WithLabelValues("accepted").Inc()
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strings"
+
+	"pulsechat/internal/logging"
 )
 
 type userIDKey struct{}
@@ -25,6 +27,7 @@ func (t *Tokens) Middleware(next http.Handler) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		logging.Set(r.Context(), logging.Fields{UserID: id, RoomID: r.PathValue("roomID")})
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userIDKey{}, id)))
 	})
 }

@@ -1,0 +1,47 @@
+logging {
+  level  = "info"
+  format = "json"
+}
+
+// Limit discovery to this Compose project, even on a shared Docker Desktop daemon.
+discovery.docker "pulsechat" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+  filter {
+    name   = "label"
+    values = [sys.env("DOCKER_PROJECT_FILTER")]
+  }
+}
+
+discovery.relabel "docker" {
+  targets = discovery.docker.pulsechat.targets
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service_name"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+// Docker's log API returns each original stdout/stderr line, already unwrapped.
+// Keep JSON intact; IDs are parsed at query time, never indexed as stream labels.
+loki.source.docker "pulsechat" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.pulsechat.targets
+  relabel_rules = discovery.relabel.docker.rules
+  labels        = { job = "docker" }
+  forward_to    = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

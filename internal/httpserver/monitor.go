@@ -73,8 +73,12 @@ func (m *Monitor) Wrap(mux *http.ServeMux, next http.Handler) http.Handler {
 			elapsed := time.Since(started)
 			m.requests.WithLabelValues(method, route, strconv.Itoa(status)).Inc()
 			m.duration.WithLabelValues(method, route).Observe(elapsed.Seconds())
-			// Never log queries, credentials, request bodies, or raw identifiers.
-			m.logger.InfoContext(r.Context(), "http request", "method", method, "route", route,
+			// Log correlation fields from context, never queries, credentials or request bodies.
+			level := slog.LevelInfo
+			if status >= 500 {
+				level = slog.LevelError
+			}
+			m.logger.Log(r.Context(), level, "http request", "method", method, "route", route,
 				"status", status, "bytes", writer.bytes, "duration", elapsed)
 		}()
 		next.ServeHTTP(writer, r)

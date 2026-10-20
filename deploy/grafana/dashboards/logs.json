@@ -1,0 +1,234 @@
+{
+  "id": null,
+  "uid": "pulsechat-logs",
+  "title": "Logs",
+  "description": "Docker container logs with JSON error filtering and request correlation across API uploads and worker processing.",
+  "tags": [
+    "pulsechat",
+    "provisioned"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Compose project",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": {
+          "type": 1,
+          "label": "compose_project",
+          "stream": "{job=\"docker\"}",
+          "refId": "project-variable"
+        },
+        "definition": "label_values({job=\"docker\"}, compose_project)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": {
+          "type": 1,
+          "label": "service_name",
+          "stream": "{job=\"docker\",compose_project=~\"$project\"}",
+          "refId": "service-variable"
+        },
+        "definition": "label_values({job=\"docker\",compose_project=~\"$project\"}, service_name)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "request_id",
+        "label": "Request ID (exact; blank shows all)",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "Pulsechat dashboards",
+      "tags": [
+        "pulsechat"
+      ],
+      "asDropdown": true,
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Search guidance",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Copy `X-Request-ID` from an API response and paste it above to correlate upload and worker logs. Request IDs contain only letters, numbers, `.`, `_`, or `-`. Blank shows all logs. IDs remain JSON fields, not stream labels. Choose api and worker for structured application logs."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Error logs",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 11
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{job=\"docker\",compose_project=~\"${project:regex}\",service_name=~\"${service:regex}\"} | json | __error__=\"\" | level=~\"(?i)(error|fatal)\" | request_id=~`^${request_id:regex}$|${request_id:regex}^.*`",
+          "queryType": "range",
+          "editorMode": "code",
+          "maxLines": 1000
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Per-request logs",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 11
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Ascending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{job=\"docker\",compose_project=~\"${project:regex}\",service_name=~\"${service:regex}\"} | json | __error__=\"\" | request_id=~`^${request_id:regex}$|${request_id:regex}^.*`",
+          "queryType": "range",
+          "editorMode": "code",
+          "maxLines": 1000
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "All container logs",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 11
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{job=\"docker\",compose_project=~\"${project:regex}\",service_name=~\"${service:regex}\"}",
+          "queryType": "range",
+          "editorMode": "code",
+          "maxLines": 1000
+        }
+      ]
+    }
+  ]
+}

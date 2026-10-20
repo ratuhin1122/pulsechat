@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"pulsechat/internal/chat"
+	"pulsechat/internal/logging"
 	"pulsechat/internal/store/db"
 )
 
@@ -98,11 +99,14 @@ func (h *Handler) readLoop(ctx context.Context, conn *websocket.Conn, c *client,
 			}
 			continue
 		}
-		if err := h.persistAndBroadcast(ctx, room, user, input.Body); err != nil {
+		fields := logging.From(ctx)
+		fields.RoomID = room.String()
+		messageCtx := logging.WithFields(ctx, fields)
+		if err := h.persistAndBroadcast(messageCtx, room, user, input.Body); err != nil {
 			if errors.Is(err, chat.ErrNotMember) || errors.Is(err, pgx.ErrNoRows) {
 				conn.Close(websocket.StatusPolicyViolation, "room membership required")
 			} else {
-				h.logger.ErrorContext(ctx, "process websocket message", "error", err)
+				h.logger.ErrorContext(messageCtx, "process websocket message", "error", err)
 				conn.Close(websocket.StatusInternalError, "message could not be delivered")
 			}
 			return
@@ -135,5 +139,9 @@ func (h *Handler) persistAndBroadcast(ctx context.Context, room, user pgtype.UUI
 	for _, member := range members {
 		ids = append(ids, member.String())
 	}
-	return h.hub.PublishRoom(ctx, room.String(), ids, data)
+	if err := h.hub.PublishRoom(ctx, room.String(), ids, data); err != nil {
+		return err
+	}
+	h.logger.InfoContext(ctx, "chat message delivered", "message_id", message.ID.String())
+	return nil
 }

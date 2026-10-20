@@ -12,6 +12,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"pulsechat/internal/logging"
 	"pulsechat/internal/store/db"
 )
 
@@ -24,7 +25,7 @@ func TestAttachmentQueue(t *testing.T) {
 	defer queue.Close()
 	id := "550e8400-e29b-41d4-a716-446655440000"
 	for i := 0; i < 2; i++ {
-		if err := queue.EnqueueAttachment(context.Background(), id); err != nil {
+		if err := queue.EnqueueAttachment(logging.WithFields(context.Background(), logging.Fields{RequestID: "upload-request-123"}), id); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -35,7 +36,7 @@ func TestAttachmentQueue(t *testing.T) {
 	}
 	task := tasks[0]
 	var payload attachmentPayload
-	if json.Unmarshal(task.Payload, &payload) != nil || payload.AttachmentID != id {
+	if json.Unmarshal(task.Payload, &payload) != nil || payload.AttachmentID != id || payload.RequestID != "upload-request-123" {
 		t.Fatal("wrong task payload")
 	}
 	if task.Type != ProcessAttachment || task.MaxRetry != 5 || task.Timeout != 2*time.Minute {
