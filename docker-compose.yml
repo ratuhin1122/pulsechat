@@ -118,7 +118,9 @@ services:
     image: prometheuscommunity/postgres-exporter:v0.20.1
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: "postgresql://pulsechat:pulsechat@postgres:5432/pulsechat?sslmode=disable"
+      DATA_SOURCE_URI: "postgres:5432/pulsechat?sslmode=disable"
+      DATA_SOURCE_USER: "${POSTGRES_EXPORTER_USER:?set POSTGRES_EXPORTER_USER in .env}"
+      DATA_SOURCE_PASS: "${POSTGRES_EXPORTER_PASSWORD:?set POSTGRES_EXPORTER_PASSWORD in .env}"
     ports:
       - "127.0.0.1:9187:9187"
     depends_on:
@@ -130,6 +132,8 @@ services:
     restart: unless-stopped
     environment:
       REDIS_ADDR: "${REDIS_URL-redis://redis:6379/0}"
+      REDIS_USER: "${REDIS_EXPORTER_USER-}"
+      REDIS_PASSWORD: "${REDIS_EXPORTER_PASSWORD-}"
     ports:
       - "127.0.0.1:9121:9121"
     depends_on:
