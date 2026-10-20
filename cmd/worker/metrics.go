@@ -12,11 +12,12 @@ import (
 	"github.com/hibiken/asynq"
 
 	"pulsechat/internal/config"
+	"pulsechat/internal/httpserver"
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/worker"
 )
 
-func serveWorker(ctx context.Context, cfg config.Config, queue *asynq.Server, handler asynq.Handler, inspector worker.QueueInspector, meter *metrics.Worker, logger *slog.Logger) error {
+func serveWorker(ctx context.Context, cfg config.Config, queue *asynq.Server, handler asynq.Handler, inspector worker.QueueInspector, meter *metrics.Worker, logger *slog.Logger, checks ...httpserver.DependencyCheck) error {
 	listener, err := net.Listen("tcp", cfg.WorkerMetricsAddr)
 	if err != nil {
 		return fmt.Errorf("listen worker metrics: %w", err)
@@ -27,7 +28,8 @@ func serveWorker(ctx context.Context, cfg config.Config, queue *asynq.Server, ha
 	}
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", meter.Handler())
-	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, WriteTimeout: 10 * time.Second}
+	httpserver.HealthRoutes(mux, ctx, logger, checks...)
+	server := &http.Server{Handler: httpserver.RequestID(mux), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, WriteTimeout: 10 * time.Second}
 	results := make(chan error, 1)
 	go func() { results <- server.Serve(listener) }()
 	pollCtx, cancelPoll := context.WithCancel(ctx)

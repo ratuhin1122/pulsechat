@@ -12,6 +12,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	"pulsechat/internal/config"
+	"pulsechat/internal/httpserver"
 	"pulsechat/internal/logging"
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
@@ -87,5 +88,8 @@ func run(logger *slog.Logger) error {
 	handler.ConfigureCompletion(database, ws.NewRedisPubSub(redis, logger))
 	mux.Handle(worker.ProcessAttachment, worker.TraceTasks(telemetry, worker.LogTasks(logger, handler)))
 	inspector := asynq.NewInspectorFromRedisClient(redis)
-	return serveWorker(ctx, cfg, server, mux, inspector, meter, logger)
+	return serveWorker(ctx, cfg, server, mux, inspector, meter, logger,
+		httpserver.DependencyCheck{Name: "postgres", Ping: database.Pool.Ping},
+		httpserver.DependencyCheck{Name: "redis", Ping: func(ctx context.Context) error { return redis.Ping(ctx).Err() }},
+		httpserver.DependencyCheck{Name: "clamav", Ping: scanner.Ping})
 }

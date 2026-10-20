@@ -73,6 +73,14 @@ func TestProcessingMetrics(t *testing.T) {
 					t.Fatalf("%s=%v,want %v", result, got, want)
 				}
 			}
+			scanErrors := value(t, m.ScanErrors).Counter.GetValue()
+			wantScanErrors := float64(0)
+			if tt.wantScan && tt.scanErr != nil {
+				wantScanErrors = 1
+			}
+			if scanErrors != wantScanErrors {
+				t.Fatalf("scan errors=%v,want %v", scanErrors, wantScanErrors)
+			}
 			scanCount := value(t, m.Scan).Histogram.GetSampleCount()
 			if (scanCount == 1) != tt.wantScan {
 				t.Fatalf("scan samples=%d", scanCount)

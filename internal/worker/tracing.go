@@ -28,6 +28,11 @@ func (h *AttachmentHandler) WithTracing(telemetry *tracing.Runtime) *AttachmentH
 }
 func (h *AttachmentHandler) scan(ctx context.Context, file io.Reader) (result ScanResult, err error) {
 	ctx, span := h.telemetry.Start(ctx, "clamd.scan", trace.WithSpanKind(trace.SpanKindClient))
-	defer func() { tracing.End(span, err) }()
+	defer func() {
+		if err != nil && h.metrics != nil {
+			h.metrics.ScanErrors.Inc()
+		}
+		tracing.End(span, err)
+	}()
 	return h.scanner.Scan(ctx, file)
 }

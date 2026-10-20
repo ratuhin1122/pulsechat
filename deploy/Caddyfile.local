@@ -40,7 +40,7 @@ http://localhost {
 	handle @metrics {
 		respond 404
 	}
-	@api path /auth /auth/* /rooms /rooms/* /users /files /files/* /presence /ws /healthz
+	@api path /auth /auth/* /rooms /rooms/* /users /files /files/* /presence /ws /healthz /readyz
 	handle @api {
 		reverse_proxy api:8080 {
 			header_up X-Forwarded-For {remote_host}

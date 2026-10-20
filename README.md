@@ -159,6 +159,94 @@ curl -k https://localhost/healthz
 
 ---
 
+## Observability
+
+Prometheus collects metrics every 15 seconds, Alloy forwards container logs to Loki, and OpenTelemetry exports traces to Tempo. Grafana queries these three data sources; Prometheus sends firing alerts to Alertmanager.
+
+```mermaid
+flowchart LR
+    API[API metrics] --> Prometheus
+    Worker[Worker metrics] --> Prometheus
+    Postgres --> PG[Postgres exporter] --> Prometheus
+    Redis --> RE[Redis exporter] --> Prometheus
+    Caddy[Caddy metrics] --> Prometheus
+    Containers[Docker container logs] --> Alloy --> Loki
+    Services[API and worker spans] -->|OTLP HTTP| Tempo
+    Prometheus -->|Metrics| Grafana
+    Loki -->|Logs| Grafana
+    Tempo -->|Traces| Grafana
+    Prometheus --> Alertmanager --> Webhook[Configured webhook]
+```
+
+### Open Grafana locally
+
+With Docker Desktop running and the root `.env` configured, start the application and monitoring services from the repository root:
+
+```sh
+make start
+docker compose -f docker-compose.yml -f deploy/compose.local.yml up -d prometheus grafana postgres-exporter redis-exporter loki alloy tempo alertmanager
+```
+
+`make start` starts the application services; the second command adds monitoring. Set `GRAFANA_ADMIN_PASSWORD` and the exporter credentials in `.env` before starting. Open [Grafana](http://127.0.0.1:3000), sign in as `admin` with `GRAFANA_ADMIN_PASSWORD`, and open the **Pulsechat** dashboard folder. Data sources and dashboards load automatically. The password initializes a new Grafana database; changing the environment variable does not rotate an existing account's password.
+
+[Prometheus](http://127.0.0.1:9090) provides scrape target status and rule evaluation; [Alertmanager](http://127.0.0.1:9093) shows routed alerts. Telemetry and Grafana state persist in named Docker volumes.
+
+### Dashboards
+
+| Dashboard | What it shows |
+|:---|:---|
+| [Chat Overview](deploy/grafana/dashboards/chat-overview.json) | Active connections, online users per API instance, messages/sec by type, disconnect reasons, and heartbeat timeouts. |
+| [HTTP and API](deploy/grafana/dashboards/http-api.json) | Request rate, p50/p95/p99 latency, and errors by route; excludes long-lived WebSocket requests. |
+| [Upload Pipeline](deploy/grafana/dashboards/upload-pipeline.json) | Accepted/rejected uploads, queue depth, processing p95 by kind, scan latency, infected/rejected counts, and original/processed bytes. |
+| [Infrastructure](deploy/grafana/dashboards/infrastructure.json) | PostgreSQL connections and transaction duration, optional slow-query statistics, Redis memory and operations/sec, and optional container CPU/memory. |
+| [Logs](deploy/grafana/dashboards/logs.json) | Error logs, container logs, and filtering by service and request ID, with links from trace IDs to Tempo. |
+
+The Infrastructure slow-query panels require `pg_stat_statements` and the exporter's corresponding collector. Container CPU/memory panels require a cAdvisor-compatible scrape job named `cadvisor`. These optional collectors are not configured by default, so those panels show no data until enabled.
+
+### Key metrics
+
+| Metric | Meaning |
+|:---|:---|
+| `ws_active_connections`, `ws_online_users` | Local WebSocket connections and distinct connected users per API instance. |
+| `chat_messages_total{type}` | Live message events delivered through each API hub, grouped by message type; excludes history replay. |
+| `ws_disconnects_total{reason}` | Disconnects classified as `heartbeat_timeout`, `client_close`, or `error`. |
+| `http_request_duration_seconds{route,method,status}` | Request latency histogram, with `_count` for request/error rates; route labels use ServeMux patterns. |
+| `uploads_total{result}` | Uploads `accepted` or `rejected_stage1`. |
+| `attachments_processed_total{kind,result}` | Worker attempts ending in `ready`, `rejected`, `infected`, or `error`. |
+| `attachment_processing_seconds{kind}` | Processing duration histogram by attachment kind. |
+| `clamav_scan_seconds`, `clamav_scan_errors_total` | Scan duration histogram and actual scan errors; infections are separate outcomes. |
+| `queue_depth{queue}` | Waiting asynq tasks, refreshed every 10 seconds; excludes active and archived tasks. |
+| `attachment_bytes_total{stage}` | Original bytes attempted and processed clean output bytes, including generated variants. |
+| `up`, `pg_stat_database_numbackends`, `redis_memory_used_bytes`, `redis_commands_processed_total` | Scrape availability, PostgreSQL connections, Redis memory, and Redis operation counts. |
+
+Online users and message events are instance-local: one user can appear on multiple API instances, and Redis fan-out delivers a message to multiple hubs. Do not interpret their summed values as unique users or persisted messages. Use `max` across worker replicas for shared queue depth. Processing counters count attempts, so retries can increase totals; byte totals are not a pure compression ratio.
+
+### Alerts
+
+Rules are defined in [alerts.yml](deploy/prometheus/alerts.yml), loaded by [prometheus.yml](deploy/prometheus/prometheus.yml), and evaluated every 15 seconds.
+
+| Alert | Trigger |
+|:---|:---|
+| `APIHigh5xxRate` | API 5xx rate above 2% for 5 minutes. |
+| `APIHighP95Latency` | A route's p95 latency above 1 second for 10 minutes. |
+| `AttachmentQueueBacklog` | Queue depth above 100 for 10 minutes. |
+| `AttachmentHighFailureRate` | Errors, rejected, and infected results above 10% of processing attempts for 10 minutes. |
+| `ClamAVScanErrors` | Scan error count increases during the last 5 minutes. |
+| `DatabaseExporterDown` | PostgreSQL or Redis exporter scrape fails or its target is absent for 1 minute. |
+| `WebSocketConnectionsDrop` | Connections fall at least 50% compared with a positive baseline 5 minutes earlier. |
+
+API latency/error alerts exclude `GET /ws`. Rate and latency rules use a 5-minute measurement window in addition to their hold duration. Set `ALERT_WEBHOOK_URL` in `.env` to an Alertmanager-compatible receiver to deliver notifications; the default placeholder does not deliver. Discord/Telegram destinations need a compatible relay or a native Alertmanager receiver configuration.
+
+### Correlate logs and traces
+
+API and worker logs use JSON with correlation fields such as `request_id`, `user_id`, `room_id`, `attachment_id`, `trace_id`, and `span_id`. Paste an API response's `X-Request-ID` into the Logs dashboard to follow a request. A log's **View trace** link opens its Tempo trace; upload trace context follows the asynq job through scanning, media processing, and WebSocket notification.
+
+Sampling is configured with `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG`. The default `parentbased_traceidratio` with argument `0.1` samples 10% of new root traces and preserves parent decisions. Use argument `1` when debugging all new traces. Unsampled requests can still have trace IDs in logs without a stored Tempo trace.
+
+### Keep monitoring private
+
+Keep Grafana, Prometheus, Alertmanager, Loki, Tempo, Alloy diagnostics, and metrics/exporter host ports bound to `127.0.0.1`, as configured in Compose. Do not change these bindings to `0.0.0.0` or expose monitoring through public Caddy routes. Use an SSH tunnel or VPN for remote administration, keep `.env` credentials private, and retain Grafana authentication. Public application access does not require public monitoring access.
+
 ## Environment Variables
 
 | Variable | Description | Default / Example | Required |

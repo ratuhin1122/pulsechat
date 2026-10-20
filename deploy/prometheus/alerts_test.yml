@@ -1,0 +1,341 @@
+rule_files:
+- alerts.yml
+evaluation_interval: 15s
+tests:
+- name: API error ratio sustained before and after hold
+  interval: 1m
+  input_series:
+  - &id001
+    series: up{job="postgres-exporter",instance="postgres-exporter:9187"}
+    values: 1x30
+  - &id002
+    series: up{job="redis-exporter",instance="redis-exporter:9121"}
+    values: 1x30
+  - series: http_request_duration_seconds_count{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200"}
+    values: 0+582x30
+  - series: http_request_duration_seconds_count{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="500"}
+    values: 0+18x30
+  alert_rule_test:
+  - eval_time: 4m
+    alertname: APIHigh5xxRate
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: APIHigh5xxRate
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        service: pulsechat
+      exp_annotations:
+        summary: API 5xx rate exceeds 2%
+        description: More than 2% of completed API requests failed with 5xx for 5
+          minutes; WebSocket lifetimes are excluded.
+- name: API exact two percent is not above threshold
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: http_request_duration_seconds_count{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200"}
+    values: 0+588x30
+  - series: http_request_duration_seconds_count{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="500"}
+    values: 0+12x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: APIHigh5xxRate
+    exp_alerts: []
+- name: WebSocket failures do not distort API error rate
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: http_request_duration_seconds_count{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200"}
+    values: 0+600x30
+  - series: http_request_duration_seconds_count{job="api",route="GET /ws",status="500"}
+    values: 0+600x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: APIHigh5xxRate
+    exp_alerts: []
+- name: P95 healthy
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: http_request_duration_seconds_bucket{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200",le="1"}
+    values: 0+600x30
+  - series: http_request_duration_seconds_bucket{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200",le="2"}
+    values: 0+600x30
+  - series: http_request_duration_seconds_bucket{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200",le="+Inf"}
+    values: 0+600x30
+  alert_rule_test:
+  - eval_time: 8m
+    alertname: APIHighP95Latency
+    exp_alerts: []
+  - eval_time: 13m
+    alertname: APIHighP95Latency
+    exp_alerts: []
+- name: P95 slow
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: http_request_duration_seconds_bucket{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200",le="1"}
+    values: 0+0x30
+  - series: http_request_duration_seconds_bucket{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200",le="2"}
+    values: 0+600x30
+  - series: http_request_duration_seconds_bucket{job="api",instance="api:9090",route="GET
+      /rooms",method="GET",status="200",le="+Inf"}
+    values: 0+600x30
+  alert_rule_test:
+  - eval_time: 8m
+    alertname: APIHighP95Latency
+    exp_alerts: []
+  - eval_time: 13m
+    alertname: APIHighP95Latency
+    exp_alerts:
+    - exp_labels:
+        route: GET /rooms
+        severity: warning
+        service: pulsechat
+      exp_annotations:
+        summary: API p95 latency exceeds 1 second
+        description: A route has p95 latency above 1 second for 10 minutes; WebSocket
+          lifetimes are excluded.
+- name: Queue backlog hold duration
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: queue_depth{job="worker",instance="worker:9091",queue="default"}
+    values: 101x30
+  alert_rule_test:
+  - eval_time: 9m
+    alertname: AttachmentQueueBacklog
+    exp_alerts: []
+  - eval_time: 11m
+    alertname: AttachmentQueueBacklog
+    exp_alerts:
+    - exp_labels:
+        queue: default
+        severity: warning
+        service: pulsechat
+      exp_annotations:
+        summary: Attachment queue depth exceeds 100
+        description: A shared queue has more than 100 waiting tasks for 10 minutes;
+          duplicate inspector samples are not summed.
+- name: Shared queue replica samples are not summed
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: queue_depth{job="worker",instance="worker-a",queue="default"}
+    values: 80x30
+  - series: queue_depth{job="worker",instance="worker-b",queue="default"}
+    values: 80x30
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: AttachmentQueueBacklog
+    exp_alerts: []
+- name: Attachment failure ratio 11
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: attachments_processed_total{job="worker",kind="image",result="error"}
+    values: 0+11x30
+  - series: attachments_processed_total{job="worker",kind="image",result="ready"}
+    values: 0+89x30
+  alert_rule_test:
+  - eval_time: 8m
+    alertname: AttachmentHighFailureRate
+    exp_alerts: []
+  - eval_time: 13m
+    alertname: AttachmentHighFailureRate
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: pulsechat
+      exp_annotations: &id003
+        summary: Attachment processing failure rate exceeds 10%
+        description: Errors, rejected files and infected files exceed 10% of processing
+          attempts for 10 minutes.
+- name: Attachment failure ratio 10
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: attachments_processed_total{job="worker",kind="image",result="error"}
+    values: 0+10x30
+  - series: attachments_processed_total{job="worker",kind="image",result="ready"}
+    values: 0+90x30
+  alert_rule_test:
+  - eval_time: 8m
+    alertname: AttachmentHighFailureRate
+    exp_alerts: []
+  - eval_time: 13m
+    alertname: AttachmentHighFailureRate
+    exp_alerts: []
+- name: Infected and rejected files count toward failed processing
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: attachments_processed_total{job="worker",kind="image",result="infected"}
+    values: 0+6x30
+  - series: attachments_processed_total{job="worker",kind="image",result="rejected"}
+    values: 0+5x30
+  - series: attachments_processed_total{job="worker",kind="image",result="ready"}
+    values: 0+89x30
+  alert_rule_test:
+  - eval_time: 13m
+    alertname: AttachmentHighFailureRate
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        service: pulsechat
+      exp_annotations: *id003
+- name: ClamAV errors 0
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: clamav_scan_errors_total{job="worker",instance="worker:9091"}
+    values: 0+0x30
+  alert_rule_test:
+  - eval_time: 2m
+    alertname: ClamAVScanErrors
+    exp_alerts: []
+- name: ClamAV errors 1
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: clamav_scan_errors_total{job="worker",instance="worker:9091"}
+    values: 0+1x30
+  alert_rule_test:
+  - eval_time: 2m
+    alertname: ClamAVScanErrors
+    exp_alerts:
+    - exp_labels:
+        instance: worker:9091
+        severity: critical
+        service: pulsechat
+      exp_annotations:
+        summary: ClamAV scan errors are increasing
+        description: At least one actual ClamAV scan failed during the last 5 minutes;
+          infections are not scan errors.
+- name: postgres-exporter scrape fails
+  interval: 1m
+  input_series:
+  - series: up{job="postgres-exporter",instance="postgres-exporter:9187"}
+    values: '0x30'
+  - series: up{job="redis-exporter",instance="redis-exporter:9121"}
+    values: 1x30
+  alert_rule_test:
+  - eval_time: 30s
+    alertname: DatabaseExporterDown
+    exp_alerts: []
+  - eval_time: 2m
+    alertname: DatabaseExporterDown
+    exp_alerts:
+    - exp_labels:
+        job: postgres-exporter
+        instance: postgres-exporter:9187
+        severity: critical
+        service: pulsechat
+      exp_annotations: &id004
+        summary: PostgreSQL or Redis exporter is unavailable
+        description: An exporter scrape has failed or its target has been absent for
+          1 minute.
+- name: redis-exporter scrape fails
+  interval: 1m
+  input_series:
+  - series: up{job="postgres-exporter",instance="postgres-exporter:9187"}
+    values: 1x30
+  - series: up{job="redis-exporter",instance="redis-exporter:9121"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 30s
+    alertname: DatabaseExporterDown
+    exp_alerts: []
+  - eval_time: 2m
+    alertname: DatabaseExporterDown
+    exp_alerts:
+    - exp_labels:
+        job: redis-exporter
+        instance: redis-exporter:9121
+        severity: critical
+        service: pulsechat
+      exp_annotations: *id004
+- name: Missing PostgreSQL target is not silently ignored
+  interval: 1m
+  input_series:
+  - *id002
+  alert_rule_test:
+  - eval_time: 30s
+    alertname: DatabaseExporterDown
+    exp_alerts: []
+  - eval_time: 2m
+    alertname: DatabaseExporterDown
+    exp_alerts:
+    - exp_labels:
+        job: postgres-exporter
+        severity: critical
+        service: pulsechat
+      exp_annotations: *id004
+- name: Exactly fifty percent drop fires
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: ws_active_connections{job="api",instance="api:9090"}
+    values: 100x4 50x30
+  alert_rule_test:
+  - eval_time: 4m
+    alertname: WebSocketConnectionsDrop
+    exp_alerts: []
+  - eval_time: 6m
+    alertname: WebSocketConnectionsDrop
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        service: pulsechat
+      exp_annotations: &id005
+        summary: WebSocket connections dropped by at least 50%
+        description: The current total is at most half its value 5 minutes ago; missing
+          current series count as zero only when a positive baseline exists.
+- name: Missing current connection series counts as outage
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: ws_active_connections{job="api",instance="api:9090"}
+    values: 100x4 stale
+  alert_rule_test:
+  - eval_time: 6m
+    alertname: WebSocketConnectionsDrop
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+        service: pulsechat
+      exp_annotations: *id005
+- name: Idle empty app is not a drop
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: ws_active_connections{job="api",instance="api:9090"}
+    values: '0x30'
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: WebSocketConnectionsDrop
+    exp_alerts: []

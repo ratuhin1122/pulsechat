@@ -63,6 +63,14 @@ func NewQueue(redisURL string) (*Queue, error) {
 
 func (q *Queue) WithTracing(telemetry *tracing.Runtime) *Queue { q.telemetry = telemetry; return q }
 
+// Ping skips Redis in the API's explicitly configured in-memory mode.
+func (q *Queue) Ping(ctx context.Context) error {
+	if q.redis == nil {
+		return nil
+	}
+	return q.redis.Ping(ctx).Err()
+}
+
 func (q *Queue) Close() error {
 	if q.redis == nil {
 		return nil

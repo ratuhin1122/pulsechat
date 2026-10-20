@@ -89,12 +89,10 @@ func run(logger *slog.Logger) error {
 	chat.New(database, logger).WithReadPublisher(websocketHandler).RegisterRoutes(mux, tokens)
 	websocketHandler.RegisterRoutes(mux)
 	upload.New(database, disk, uploadLimiter, attachmentQueue, logger).WithMetrics(meter).RegisterRoutes(mux, tokens)
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		if _, err := w.Write([]byte("ok\n")); err != nil {
-			logger.ErrorContext(r.Context(), "write health response", "error", err)
-		}
-	})
+	httpserver.HealthRoutes(mux, ctx, logger,
+		httpserver.DependencyCheck{Name: "postgres", Ping: database.Pool.Ping},
+		httpserver.DependencyCheck{Name: "redis", Ping: attachmentQueue.Ping})
+
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           httpserver.RequestID(telemetry.HTTP(mux, meter.Middleware(mux, monitor.Wrap(mux, limits.Wrap(mux))))),

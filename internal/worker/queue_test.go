@@ -113,3 +113,29 @@ func TestWorkerConsumesAttachment(t *testing.T) {
 		t.Fatal("worker did not consume attachment task")
 	}
 }
+
+func TestQueuePing(t *testing.T) {
+	disabled, err := NewQueue("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer disabled.Close()
+	if err := disabled.Ping(context.Background()); err != nil {
+		t.Fatal("in-memory mode should not require Redis")
+	}
+	redis := miniredis.RunT(t)
+	queue, err := NewQueue("redis://" + redis.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer queue.Close()
+	if err := queue.Ping(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	redis.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := queue.Ping(ctx); err == nil {
+		t.Fatal("readiness ignored unavailable Redis")
+	}
+}

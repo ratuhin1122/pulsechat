@@ -26,10 +26,17 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   api:
     build: .
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     ports:
       - "127.0.0.1:9092:9090"
     expose:
@@ -58,6 +65,12 @@ services:
 
   worker:
     build: .
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:9091/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     ports:
       - "127.0.0.1:9091:9091"
     entrypoint: ["/app/worker"]
@@ -157,6 +170,23 @@ services:
     volumes:
       - prometheus_data:/prometheus
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    restart: unless-stopped
+    user: "65534:65534"
+    entrypoint: ["/bin/sh", "/etc/alertmanager/start.sh"]
+    environment:
+      ALERT_WEBHOOK_URL: "${ALERT_WEBHOOK_URL:-http://127.0.0.1:65535/replace-me}"
+    ports:
+      - "127.0.0.1:9093:9093"
+    tmpfs:
+      - /run/alertmanager:uid=65534,gid=65534,mode=0700
+    volumes:
+      - alertmanager_data:/alertmanager
+      - ./deploy/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./deploy/alertmanager/start.sh:/etc/alertmanager/start.sh:ro
 
   loki:
     image: grafana/loki:3.7.8
@@ -229,3 +259,4 @@ volumes:
   loki_data:
   alloy_data:
   tempo_data:
+  alertmanager_data:
