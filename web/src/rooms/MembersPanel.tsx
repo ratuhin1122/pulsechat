@@ -26,7 +26,7 @@ export function MembersPanel({ api, room, onClose, onLeave, leaving, leaveDisabl
     return () => controller.abort();
   }, [api, room.id, offset, attempt]);
   return <aside className="members-panel" id="room-members-panel" aria-label="Room members" onKeyDown={(event) => {
-    if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+    if (event.key === 'Escape') onClose();
   }}>
     <header><div><h2>Members</h2><p>{room.name || 'Conversation'}</p></div>
       <button type="button" ref={close} className="text-button" aria-label="Close members" onClick={onClose}>Close</button>

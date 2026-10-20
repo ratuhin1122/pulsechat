@@ -84,7 +84,7 @@ func (h *Handler) readLoop(ctx context.Context, conn *websocket.Conn, c *client,
 			}
 			return
 		}
-		if _, err := h.tokens.Validate(raw); err != nil {
+		if _, err := h.tokens.ValidateContext(ctx, raw); err != nil {
 			conn.Close(websocket.StatusPolicyViolation, "access token expired")
 			return
 		}

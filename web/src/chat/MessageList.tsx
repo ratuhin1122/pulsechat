@@ -59,7 +59,7 @@ export function MessageList({ userID, reads = {}, messages, loading, initialized
             : initialized && messages.length > 0 ? <span>Beginning of this conversation</span> : null}
     </div>
     {!loading && !error && !messages.length && <div className="empty-messages"><h2>Start the conversation.</h2><p>A simple hello is a good place to begin.</p></div>}
-    {messages.map((message) => <article className="chat-message" key={message.id} data-message-id={message.id}>
+    {messages.map((message) => <article className={`chat-message ${message.sender_id === userID ? 'is-own' : 'is-other'}`} key={message.id} data-message-id={message.id}>
       <div className="message-avatar" aria-hidden="true">{message.sender_id.slice(0, 2).toUpperCase()}</div>
       <div className="message-content"><header>
         <span className="message-author" title={message.sender_id}>User {message.sender_id.slice(0, 8)}</span>

@@ -66,7 +66,7 @@ func (q *Queries) GetRoom(ctx context.Context, id pgtype.UUID) (Room, error) {
 const listRoomsForUser = `-- name: ListRoomsForUser :many
 SELECT r.id, r.type, r.name, r.created_at, r.is_public FROM rooms r
 JOIN room_members m ON m.room_id = r.id
-WHERE m.user_id = $1 ORDER BY r.created_at, r.id LIMIT $2 OFFSET $3
+WHERE m.user_id = $1 AND NOT EXISTS (SELECT 1 FROM personal_chat_deletions d WHERE d.room_id=r.id AND d.user_id=m.user_id AND d.hidden) ORDER BY r.created_at, r.id LIMIT $2 OFFSET $3
 `
 
 type ListRoomsForUserParams struct {

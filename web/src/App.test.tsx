@@ -10,7 +10,10 @@ import { ApiClient } from './api/client';
 import { HttpClient } from './api/http';
 import { TestSocket } from './chat/testSocket';
 
-beforeEach(() => { TestSocket.instances = []; vi.stubGlobal('WebSocket', TestSocket); });
+beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.setAttribute('open', ''); });
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.removeAttribute('open'); });
+  TestSocket.instances = []; vi.stubGlobal('WebSocket', TestSocket); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 function setup(handler: typeof fetch, path = '/login') {
@@ -47,13 +50,13 @@ it('signs in, lists and filters rooms, selects a room, and signs out', async () 
   await user.type(screen.getByLabelText('Email address'), 'you@example.com');
   await user.type(screen.getByLabelText('Password', { exact: true }), 'password123');
   await user.click(screen.getByRole('button', { name: 'Sign in' }));
-  await screen.findByRole('button', { name: /Engineering/ });
+  await screen.findByRole('button', { name: 'Engineering, Group room' });
   await user.type(screen.getByRole('searchbox', { name: 'Find a room' }), 'design');
-  expect(screen.queryByRole('button', { name: /Engineering/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Engineering, Group room' })).toBeNull();
   await user.clear(screen.getByRole('searchbox', { name: 'Find a room' }));
   await user.click(screen.getByRole('button', { name: 'Open rooms' }));
   expect(screen.getByRole('button', { name: 'Close rooms' }).getAttribute('aria-expanded')).toBe('true');
-  await user.click(screen.getByRole('button', { name: /Engineering/ }));
+  await user.click(screen.getByRole('button', { name: 'Engineering, Group room' }));
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Engineering');
   expect(screen.getByRole('button', { name: 'Open rooms' }).getAttribute('aria-expanded')).toBe('false');
   await user.click(screen.getByRole('button', { name: 'Sign out' }));
@@ -99,7 +102,7 @@ it('restores a session silently and retries a failed room request', async () => 
   await screen.findByRole('alert');
   fail = false;
   await user.click(screen.getByRole('button', { name: 'Try again' }));
-  await screen.findByRole('button', { name: /Engineering/ });
+  await screen.findByRole('button', { name: 'Engineering, Group room' });
   await waitFor(() => expect(fetcher.mock.calls.filter(([path]) => path === '/auth/refresh')).toHaveLength(1));
 });
 
@@ -112,7 +115,70 @@ it('loads subsequent room pages without losing the first page', async () => {
   }, '/');
   await screen.findByRole('button', { name: 'Load more rooms' });
   await user.click(screen.getByRole('button', { name: 'Load more rooms' }));
-  await screen.findByRole('button', { name: /Last room/ });
+  await screen.findByRole('button', { name: 'Last room, Group room' });
   expect(screen.getByRole('button', { name: 'Room 0, Group room' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Load more rooms' })).toBeNull();
+});
+
+it('keeps chats closed until selected, closes with Escape, and places search before New chat', async () => {
+  const { user } = setup(async (path) => {
+    if (path === '/auth/refresh') return signedIn();
+    if (String(path).includes('/messages?') || String(path).startsWith('/presence?')) return Response.json([]);
+    return Response.json(rooms);
+  }, '/');
+  const room = await screen.findByRole('button', { name: 'Engineering, Group room' });
+  expect(screen.queryByRole('region', { name: 'Conversation' })).toBeNull();
+  const search = screen.getByRole('searchbox', { name: 'Find a room' });
+  expect(search.compareDocumentPosition(screen.getByRole('button', { name: /New chat/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  await user.click(room);
+  expect(screen.getByRole('region', { name: 'Conversation' })).toBeTruthy();
+  await user.keyboard('{Escape}');
+  expect(screen.queryByRole('region', { name: 'Conversation' })).toBeNull();
+  await user.click(room);
+  expect(screen.getByRole('region', { name: 'Conversation' })).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Members' }));
+  await user.keyboard('{Escape}');
+  expect(screen.queryByRole('region', { name: 'Conversation' })).toBeNull();
+});
+
+it('deletes a chat only after confirmation and clears the selected conversation', async () => {
+  let deleted = false;
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  onTestFinished(() => confirm.mockRestore());
+  const { user, fetcher } = setup(async (path, init) => {
+    if (path === '/auth/refresh') return signedIn();
+    if (path === '/rooms/room-1' && init?.method === 'DELETE') { deleted = true; return new Response(null, { status: 204 }); }
+    if (String(path).includes('/messages?') || String(path).startsWith('/presence?')) return Response.json([]);
+    return Response.json(deleted ? rooms.slice(1) : rooms);
+  }, '/');
+  await user.click(await screen.findByRole('button', { name: 'Engineering, Group room' }));
+  await user.click(screen.getByRole('button', { name: 'Delete Engineering chat' }));
+  expect(fetcher.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
+  confirm.mockReturnValue(true);
+  await user.click(screen.getByRole('button', { name: 'Delete Engineering chat' }));
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Engineering, Group room' })).toBeNull());
+  expect(screen.queryByRole('region', { name: 'Conversation' })).toBeNull();
+});
+
+it('confirms account deletion with a password, handles errors, and clears the session', async () => {
+  let attempts = 0;
+  const { user, session } = setup(async (path, init) => {
+    if (path === '/auth/refresh') return signedIn();
+    if (path === '/auth/account') {
+      expect(init?.method).toBe('DELETE');
+      expect(JSON.parse(String(init?.body))).toEqual({ password: 'password123' });
+      attempts++;
+      return attempts === 1 ? new Response('password is incorrect', { status: 403 }) : new Response(null, { status: 204 });
+    }
+    return Response.json([]);
+  }, '/');
+  await user.click(await screen.findByRole('button', { name: 'Delete account' }));
+  expect(screen.getByRole('dialog', { name: 'Delete your account?' })).toBeTruthy();
+  await user.type(screen.getByLabelText('Confirm your password'), 'password123');
+  await user.click(screen.getByRole('button', { name: 'Permanently delete account' }));
+  expect((await screen.findByRole('alert')).textContent).toContain('password is incorrect');
+  expect(session.getSnapshot().status).toBe('authenticated');
+  await user.click(screen.getByRole('button', { name: 'Permanently delete account' }));
+  await screen.findByRole('heading', { name: 'Welcome back.' });
+  expect(session.getSnapshot().status).toBe('anonymous');
 });

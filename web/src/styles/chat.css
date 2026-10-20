@@ -44,3 +44,10 @@
   .message-avatar { width: 28px; height: 28px; border-radius: 9px; }
   .message-content time { font-size: 9px; }
 }
+
+.chat-message.is-own { justify-content: flex-start; }
+.chat-message.is-other { flex-direction: row-reverse; }
+.chat-message .message-content { max-width: min(760px, 80%); }
+.chat-message.is-other .message-content header { justify-content: flex-end; }
+.chat-message .message-body { margin: 0; padding: 10px 14px; border-radius: 12px; background: #eaf0e5; }
+.chat-message.is-other .message-body { background: #f3f5f1; }

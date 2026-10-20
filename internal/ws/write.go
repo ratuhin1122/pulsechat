@@ -69,6 +69,25 @@ func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, r
 			conn.Close(c.closeCode, c.closeReason)
 			return
 		case data := <-c.send:
+			if visibility, ok := h.repo.(interface {
+				MessageVisible(context.Context, pgtype.UUID, pgtype.UUID) (bool, error)
+			}); ok {
+				var event struct {
+					ID pgtype.UUID `json:"id"`
+				}
+				var user pgtype.UUID
+				_ = user.Scan(c.userID)
+				if json.Unmarshal(data, &event) == nil && event.ID.Valid {
+					visible, err := visibility.MessageVisible(ctx, event.ID, user)
+					if err != nil {
+						conn.CloseNow()
+						return
+					}
+					if !visible {
+						continue
+					}
+				}
+			}
 			if c.replayed != nil {
 				var event struct {
 					ID pgtype.UUID `json:"id"`
@@ -79,7 +98,7 @@ func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, r
 					}
 				}
 			}
-			if _, err := h.tokens.Validate(raw); err != nil {
+			if _, err := h.tokens.ValidateContext(ctx, raw); err != nil {
 				conn.Close(websocket.StatusPolicyViolation, "access token expired")
 				return
 			}
@@ -90,7 +109,7 @@ func (h *Handler) writePump(ctx context.Context, conn socketWriter, c *client, r
 				return
 			}
 		case <-ticks:
-			if _, err := h.tokens.Validate(raw); err != nil {
+			if _, err := h.tokens.ValidateContext(ctx, raw); err != nil {
 				conn.Close(websocket.StatusPolicyViolation, "access token expired")
 				return
 			}

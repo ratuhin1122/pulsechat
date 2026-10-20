@@ -25,6 +25,10 @@ export class ApiClient {
     }
   }
 
+  deleteChat(id: string, signal: AbortSignal): Promise<void> {
+    return this.authorized((token) => this.http.send<void>(`/rooms/${encodeURIComponent(id)}`, { method: 'DELETE', signal, headers: { Authorization: `Bearer ${token}` } }), signal);
+  }
+
   file(id: string, variant: 'thumb' | 'display' | 'original', signal?: AbortSignal): Promise<Blob> {
     return this.authorized((token) => this.http.blob(`/files/${encodeURIComponent(id)}?variant=${variant}`, token, signal), signal);
   }

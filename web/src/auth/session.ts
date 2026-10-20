@@ -124,6 +124,18 @@ export class Session {
     });
   }
 
+  async deleteAccount(password: string): Promise<void> {
+    const token = await this.getAccessToken();
+    this.signingOut = true;
+    clearTimeout(this.timer);
+    try {
+      await this.enqueue(() => this.http.send<void>('/auth/account', {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
+      }));
+      this.clear();
+    } finally { this.signingOut = false; this.schedule(); }
+  }
+
   async logout(): Promise<void> {
     this.signingOut = true;
     clearTimeout(this.timer);

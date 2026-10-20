@@ -63,6 +63,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer disk.Close()
+	cleanupCtx, stopCleanup := context.WithCancel(ctx)
+	cleanupDone := make(chan struct{})
+	go func() { defer close(cleanupDone); worker.CleanDeletedFiles(cleanupCtx, database, disk, logger) }()
+	defer func() { stopCleanup(); <-cleanupDone }()
 	images, closeImages, err := worker.NewImageProcessor()
 	if err != nil {
 		return err

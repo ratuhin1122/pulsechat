@@ -69,7 +69,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	raw := accessToken(r)
-	userID, err := h.tokens.Validate(raw)
+	userID, err := h.tokens.ValidateContext(r.Context(), raw)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

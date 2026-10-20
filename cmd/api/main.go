@@ -63,6 +63,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer database.Close()
+	tokens.WithUserLookup(func(ctx context.Context, id string) (bool, error) {
+		var exists bool
+		err := database.Pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE id=$1)", id).Scan(&exists)
+		return exists, err
+	})
 	websocketHandler, closeRealtime, err := newRealtime(ctx, cfg, database, tokens, logger, meter, telemetry)
 	if err != nil {
 		return err
@@ -86,6 +91,7 @@ func run(logger *slog.Logger) error {
 
 	mux := http.NewServeMux()
 	auth.NewWithOptions(database, tokens, logger, auth.Options{LocalHTTP: cfg.DevHTTP}).RegisterRoutes(mux)
+	auth.NewAccountHandler(database, disk, logger, cfg.DevHTTP).WithChatPublisher(websocketHandler).RegisterRoutes(mux, tokens)
 	chat.New(database, logger).WithReadPublisher(websocketHandler).RegisterRoutes(mux, tokens)
 	websocketHandler.RegisterRoutes(mux)
 	upload.New(database, disk, uploadLimiter, attachmentQueue, logger).WithMetrics(meter).RegisterRoutes(mux, tokens)

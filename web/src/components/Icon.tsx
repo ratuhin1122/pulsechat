@@ -1,7 +1,8 @@
-type IconName = 'rooms' | 'search' | 'arrow' | 'logout' | 'menu' | 'close' | 'refresh' | 'message' | 'hash';
+type IconName = 'trash' | 'rooms' | 'search' | 'arrow' | 'logout' | 'menu' | 'close' | 'refresh' | 'message' | 'hash';
 
 export function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, string> = {
+    trash: 'M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7',
     rooms: 'M4 5h16v12H9l-5 4V5Z M8 9h8 M8 13h5',
     search: 'M21 21l-5-5 M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
     arrow: 'M5 12h14 M13 6l6 6-6 6',

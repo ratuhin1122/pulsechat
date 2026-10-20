@@ -27,7 +27,7 @@ async function setup(handler?: (path: string, init?: RequestInit) => Promise<Res
   });
   const http = new HttpClient(fetcher); const session = new Session(http); onTestFinished(() => session.dispose());
   const api = new ApiClient(http, session); const select = vi.fn();
-  function Harness() { const store = useRooms(api); return <Sidebar open selected={null} onSelect={select} store={store} />; }
+  function Harness() { const store = useRooms(api); return <Sidebar onDelete={vi.fn()} open selected={null} onSelect={select} store={store} />; }
   render(<MemoryRouter><AuthProvider services={{ session, api }}><Harness /></AuthProvider></MemoryRouter>);
   await waitFor(() => expect((screen.getByRole('button', { name: /New chat/ }) as HTMLButtonElement).disabled).toBe(false));
   return { fetcher, select, user: userEvent.setup() };

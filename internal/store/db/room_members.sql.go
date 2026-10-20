@@ -33,7 +33,8 @@ func (q *Queries) AddRoomMember(ctx context.Context, arg AddRoomMemberParams) (R
 }
 
 const getRoomMember = `-- name: GetRoomMember :one
-SELECT room_id, user_id, joined_at, last_read_message_id FROM room_members WHERE room_id = $1 AND user_id = $2
+SELECT room_id, user_id, joined_at, last_read_message_id FROM room_members WHERE room_members.room_id = $1 AND room_members.user_id = $2
+AND NOT EXISTS (SELECT 1 FROM personal_chat_deletions d WHERE d.room_id=room_members.room_id AND d.user_id=room_members.user_id AND d.hidden)
 `
 
 type GetRoomMemberParams struct {

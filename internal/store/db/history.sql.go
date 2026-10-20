@@ -15,6 +15,7 @@ const getLatestUserMessage = `-- name: GetLatestUserMessage :one
 SELECT m.id, m.room_id, m.sender_id, m.type, m.body, m.created_at FROM messages m
 JOIN room_members member ON member.room_id = m.room_id
 WHERE member.user_id = $1
+    AND NOT EXISTS (SELECT 1 FROM personal_chat_deletions d WHERE d.user_id=member.user_id AND d.room_id=m.room_id AND (d.hidden OR (m.created_at <= d.cleared_at OR EXISTS (SELECT 1 FROM attachments old_file WHERE old_file.message_id=m.id AND old_file.created_at <= d.cleared_at))))
 ORDER BY m.created_at DESC, m.id DESC LIMIT 1
 `
 
@@ -84,6 +85,7 @@ const listReplayMessages = `-- name: ListReplayMessages :many
 SELECT m.id, m.room_id, m.sender_id, m.type, m.body, m.created_at FROM messages m
 JOIN room_members member ON member.room_id = m.room_id
 WHERE member.user_id = $1
+    AND NOT EXISTS (SELECT 1 FROM personal_chat_deletions d WHERE d.user_id=member.user_id AND d.room_id=m.room_id AND (d.hidden OR (m.created_at <= d.cleared_at OR EXISTS (SELECT 1 FROM attachments old_file WHERE old_file.message_id=m.id AND old_file.created_at <= d.cleared_at))))
     AND (m.created_at, m.id) > ($2::timestamptz, $3::uuid)
     AND (m.created_at, m.id) <= ($4::timestamptz, $5::uuid)
 ORDER BY m.created_at, m.id
@@ -135,15 +137,17 @@ func (q *Queries) ListReplayMessages(ctx context.Context, arg ListReplayMessages
 
 const listRoomHistory = `-- name: ListRoomHistory :many
 SELECT id, room_id, sender_id, type, body, created_at FROM messages
-WHERE room_id = $1
-    AND ($2::timestamptz IS NULL
-        OR (created_at, id) < ($2::timestamptz, $3::uuid))
+WHERE messages.room_id = $1
+    AND NOT EXISTS (SELECT 1 FROM personal_chat_deletions d WHERE d.user_id=$2 AND d.room_id=messages.room_id AND (d.hidden OR (messages.created_at <= d.cleared_at OR EXISTS (SELECT 1 FROM attachments old_file WHERE old_file.message_id=messages.id AND old_file.created_at <= d.cleared_at))))
+    AND ($3::timestamptz IS NULL
+        OR (created_at, id) < ($3::timestamptz, $4::uuid))
 ORDER BY created_at DESC, id DESC
-LIMIT $4
+LIMIT $5
 `
 
 type ListRoomHistoryParams struct {
 	RoomID          pgtype.UUID
+	UserID          pgtype.UUID
 	BeforeCreatedAt pgtype.Timestamptz
 	BeforeID        pgtype.UUID
 	PageLimit       int32
@@ -152,6 +156,7 @@ type ListRoomHistoryParams struct {
 func (q *Queries) ListRoomHistory(ctx context.Context, arg ListRoomHistoryParams) ([]Message, error) {
 	rows, err := q.db.Query(ctx, listRoomHistory,
 		arg.RoomID,
+		arg.UserID,
 		arg.BeforeCreatedAt,
 		arg.BeforeID,
 		arg.PageLimit,

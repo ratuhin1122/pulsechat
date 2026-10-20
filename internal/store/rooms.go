@@ -68,6 +68,9 @@ func (s *Store) GetOrCreateDirectRoom(ctx context.Context, user, peer pgtype.UUI
 	} else if err != nil {
 		return db.Room{}, fmt.Errorf("find direct room: %w", err)
 	}
+	if _, err := tx.Exec(ctx, "UPDATE personal_chat_deletions SET hidden=false WHERE room_id=$1 AND user_id=$2", room.ID, user); err != nil {
+		return db.Room{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return db.Room{}, fmt.Errorf("commit direct room: %w", err)
 	}

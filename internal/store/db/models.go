@@ -39,6 +39,13 @@ type Message struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type PersonalChatDeletion struct {
+	UserID    pgtype.UUID
+	RoomID    pgtype.UUID
+	ClearedAt pgtype.Timestamptz
+	Hidden    bool
+}
+
 type RefreshToken struct {
 	TokenHash []byte
 	UserID    pgtype.UUID
@@ -59,6 +66,11 @@ type RoomMember struct {
 	UserID            pgtype.UUID
 	JoinedAt          pgtype.Timestamptz
 	LastReadMessageID pgtype.UUID
+}
+
+type StorageDeletion struct {
+	Area string
+	Name string
 }
 
 type User struct {

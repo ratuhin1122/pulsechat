@@ -22,7 +22,7 @@ func (t *Tokens) Middleware(next http.Handler) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		id, err := t.Validate(parts[1])
+		id, err := t.ValidateContext(r.Context(), parts[1])
 		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return

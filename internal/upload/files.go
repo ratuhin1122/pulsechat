@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"errors"
 	"mime"
 	"net/http"
@@ -43,6 +44,19 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 	if err := chat.RequireMembership(r.Context(), h.repo, a.RoomID, user); err != nil {
 		h.fail(w, r, err)
 		return
+	}
+	if visibility, ok := h.repo.(interface {
+		AttachmentVisible(context.Context, pgtype.UUID, pgtype.UUID) (bool, error)
+	}); ok {
+		visible, err := visibility.AttachmentVisible(r.Context(), id, user)
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
+		if !visible {
+			http.NotFound(w, r)
+			return
+		}
 	}
 	if a.Status != "ready" {
 		http.NotFound(w, r)

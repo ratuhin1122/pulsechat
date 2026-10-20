@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 const AccessTokenTTL = 15 * time.Minute
 
 type Tokens struct {
-	key []byte
+	key        []byte
+	userExists func(context.Context, string) (bool, error)
 }
 
 func NewTokens(secret string) (*Tokens, error) {
@@ -48,4 +50,27 @@ func (t *Tokens) Validate(raw string) (string, error) {
 		return "", fmt.Errorf("invalid token subject")
 	}
 	return claims.Subject, nil
+}
+
+// WithUserLookup must be configured before serving requests. It revokes access
+// to deleted accounts across API instances without keeping token state in memory.
+func (t *Tokens) WithUserLookup(lookup func(context.Context, string) (bool, error)) *Tokens {
+	t.userExists = lookup
+	return t
+}
+func (t *Tokens) ValidateContext(ctx context.Context, raw string) (string, error) {
+	id, err := t.Validate(raw)
+	if err != nil {
+		return "", err
+	}
+	if t.userExists != nil {
+		ok, err := t.userExists(ctx, id)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", fmt.Errorf("account no longer exists")
+		}
+	}
+	return id, nil
 }

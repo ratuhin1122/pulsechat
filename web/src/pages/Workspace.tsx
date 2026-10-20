@@ -38,20 +38,41 @@ export function Workspace() {
     setSelected((current) => current?.id === id ? null : current);
     setMembersID((current) => current === id ? null : current);
   }, [rooms.removeRoom]);
+  const uploadsRef = useRef(uploads);
+  uploadsRef.current = uploads;
+  useEffect(() => {
+    if (!realtime.deletedChats) return;
+    const id = realtime.deletedChats.roomID;
+    uploadsRef.current.items.filter((item) => item.roomID === id).forEach((item) => uploadsRef.current.remove(item.key));
+    removed(id);
+  }, [realtime.deletedChats, removed]);
   const leave = useLeaveRoom(api, removed);
   const menuButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { document.title = `${selected ? roomName(selected) : 'Your space'} · Pulsechat`; }, [selected]);
   useEffect(() => { heading.current?.focus(); }, [selected]);
 
-  return <div className="workspace" onKeyDown={(event) => {
-    if (event.key === 'Escape' && open) { setOpen(false); menuButton.current?.focus(); }
-  }}>
+  useEffect(() => {
+    const closeChat = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog[open]')
+        || event.target instanceof Element && event.target.closest('[role="dialog"]')) return;
+      setSelected(null); setMembersID(null); setOpen(false);
+      if (open) menuButton.current?.focus();
+    };
+    window.addEventListener('keydown', closeChat);
+    return () => window.removeEventListener('keydown', closeChat);
+  }, [open]);
+
+  return <div className="workspace">
     <header className="mobile-header"><Brand />
       <button ref={menuButton} className="icon-button" aria-label={open ? 'Close rooms' : 'Open rooms'}
         aria-expanded={open} aria-controls="room-sidebar" onClick={() => setOpen(!open)}><Icon name={open ? 'close' : 'menu'} /></button>
     </header>
-    <Sidebar open={open} selected={selected} store={rooms} onSelect={(room) => { setSelected(room); setMembersID(null); setOpen(false); }} />
+    <Sidebar onDelete={async (room) => {
+      await api.deleteChat(room.id, new AbortController().signal);
+      uploads.items.filter((item) => item.roomID === room.id).forEach((item) => uploads.remove(item.key));
+      realtime.clearRoom(room.id); removed(room.id);
+    }} open={open} selected={selected} store={rooms} onSelect={(room) => { setSelected(room); setMembersID(null); setOpen(false); }} />
     <main className="conversation-panel" id="main-content">
       <header className="conversation-header"><div className="room-heading-icon"><Icon name={selected?.type === 'group' ? 'hash' : 'rooms'} /></div>
         <div><h1 ref={heading} tabIndex={-1}>{selected ? roomName(selected) : 'Your space'}</h1>

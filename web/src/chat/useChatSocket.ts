@@ -7,6 +7,7 @@ import type { ConnectionStatus, Message, PresenceChange } from './types';
 export function useChatSocket(session: Session) {
   const socket = useRef<ChatSocket | null>(null);
   const revision = useRef(0);
+  const [deletedChats, setDeletedChats] = useState<{ roomID: string; revision: number } | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [epoch, setEpoch] = useState(0);
   const [attachments, setAttachments] = useState<Record<string, 'ready' | 'rejected'>>({});
@@ -26,6 +27,10 @@ export function useChatSocket(session: Session) {
           setMessages((previous) => ({ ...previous,
             [message.room_id]: mergeMessages(previous[message.room_id] ?? [], [message]),
           }));
+        } else if (event.type === 'chat_deleted') {
+          setMessages((previous) => { const next = { ...previous }; delete next[event.room_id]; return next; });
+          setReads((previous) => { const next = { ...previous }; delete next[event.room_id]; return next; });
+          setDeletedChats({ roomID: event.room_id, revision: ++revision.current });
         } else if (event.type === 'attachment_status') {
           setAttachments((previous) => ({ ...previous, [event.attachment_id]: event.status }));
         } else if (event.type === 'read') {
@@ -49,5 +54,9 @@ export function useChatSocket(session: Session) {
   }, [session]);
   const send = useCallback((roomID: string, body: string) => socket.current?.send(roomID, body) ?? false, []);
   const seedCursor = useCallback((message: Message) => socket.current?.seedCursor(message), []);
-  return { status, epoch, reads, messages, presence, attachments, send, seedCursor };
+  const clearRoom = useCallback((roomID: string) => {
+    setMessages((previous) => { const next = { ...previous }; delete next[roomID]; return next; });
+    setReads((previous) => { const next = { ...previous }; delete next[roomID]; return next; });
+  }, []);
+  return { deletedChats, clearRoom, status, epoch, reads, messages, presence, attachments, send, seedCursor };
 }

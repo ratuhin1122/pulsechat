@@ -69,3 +69,12 @@
   .conversation-empty { padding: 50px 24px; }
   .room-label { display: none; }
 }
+
+.room-row { position: relative; display: flex; align-items: center; }
+.room-row .room-button { padding-right: 42px; }
+.delete-chat-button { position: absolute; right: 5px; width: 30px; height: 34px; color: #9a4141; }
+.delete-chat-button:hover { background: #fae9e7; }
+.danger-text { color: #a33535; margin-bottom: 12px; }
+.danger-button { border: 0; border-radius: 8px; padding: 10px 14px; color: white; background: #a33535; }
+.danger-button:disabled { opacity: .55; }
+.deletion-actions { display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 20px; }

@@ -51,6 +51,9 @@ func (h *Handler) registerForReplay(ctx context.Context, c *client, cursor *db.M
 		queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		latest, err := h.repo.GetLatestUserMessage(queryCtx, user)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		if err != nil {
 			h.hub.unregister(c)
 			return nil, err
@@ -91,7 +94,7 @@ func (h *Handler) replay(ctx context.Context, conn socketWriter, c *client, raw 
 				}
 			default:
 			}
-			if _, err := h.tokens.Validate(raw); err != nil {
+			if _, err := h.tokens.ValidateContext(ctx, raw); err != nil {
 				return err
 			}
 			var attachments []chat.AttachmentResponse

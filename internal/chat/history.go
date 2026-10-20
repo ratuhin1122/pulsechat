@@ -35,7 +35,7 @@ func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	params := db.ListRoomHistoryParams{RoomID: room, PageLimit: 50}
+	params := db.ListRoomHistoryParams{RoomID: room, UserID: user, PageLimit: 50}
 	query := r.URL.Query()
 	if values, ok := query["limit"]; ok {
 		limit, err := strconv.ParseInt(values[0], 10, 32)
