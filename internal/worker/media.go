@@ -12,10 +12,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
+	"pulsechat/internal/tracing"
 	"pulsechat/internal/upload"
 )
 
-func (h *AttachmentHandler) processMedia(ctx context.Context, a db.Attachment) error {
+func (h *AttachmentHandler) processMedia(ctx context.Context, a db.Attachment) (processErr error) {
+	ctx, span := h.telemetry.Start(ctx, "attachment.media.process")
+	defer func() { tracing.End(span, processErr) }()
 	limit := int64(25 << 20)
 	if a.Kind == "voice" {
 		limit = 10 << 20

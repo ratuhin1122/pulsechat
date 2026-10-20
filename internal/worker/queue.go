@@ -10,8 +10,11 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	"pulsechat/internal/logging"
+	"pulsechat/internal/tracing"
 )
 
 const (
@@ -21,13 +24,16 @@ const (
 )
 
 type attachmentPayload struct {
-	AttachmentID string `json:"attachment_id"`
-	RequestID    string `json:"request_id,omitempty"`
+	TraceID      string                 `json:"trace_id,omitempty"`
+	TraceContext propagation.MapCarrier `json:"trace_context,omitempty"`
+	AttachmentID string                 `json:"attachment_id"`
+	RequestID    string                 `json:"request_id,omitempty"`
 }
 
 type Queue struct {
-	client *asynq.Client
-	redis  *redis.Client
+	telemetry *tracing.Runtime
+	client    *asynq.Client
+	redis     *redis.Client
 }
 
 func NewRedisClient(redisURL string) (*redis.Client, error) {
@@ -55,6 +61,8 @@ func NewQueue(redisURL string) (*Queue, error) {
 	return &Queue{client: asynq.NewClientFromRedisClient(client), redis: client}, nil
 }
 
+func (q *Queue) WithTracing(telemetry *tracing.Runtime) *Queue { q.telemetry = telemetry; return q }
+
 func (q *Queue) Close() error {
 	if q.redis == nil {
 		return nil
@@ -66,23 +74,33 @@ func NewProcessAttachmentTask(attachmentID string) (*asynq.Task, error) {
 	return newProcessAttachmentTask(attachmentID, "")
 }
 
-func newProcessAttachmentTask(attachmentID, requestID string) (*asynq.Task, error) {
+func newProcessAttachmentTask(attachmentID, requestID string, carriers ...propagation.MapCarrier) (*asynq.Task, error) {
 	var id pgtype.UUID
 	if err := id.Scan(attachmentID); err != nil || !id.Valid {
 		return nil, fmt.Errorf("invalid attachment ID")
 	}
-	data, err := json.Marshal(attachmentPayload{AttachmentID: id.String(), RequestID: requestID})
+	payload := attachmentPayload{AttachmentID: id.String(), RequestID: requestID}
+	if len(carriers) > 0 {
+		payload.TraceContext = carriers[0]
+		sc := trace.SpanContextFromContext(tracing.Extract(context.Background(), carriers[0]))
+		if sc.IsValid() {
+			payload.TraceID = sc.TraceID().String()
+		}
+	}
+	data, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("encode attachment task: %w", err)
 	}
 	return asynq.NewTask(ProcessAttachment, data), nil
 }
 
-func (q *Queue) EnqueueAttachment(ctx context.Context, attachmentID string) error {
+func (q *Queue) EnqueueAttachment(ctx context.Context, attachmentID string) (taskErr error) {
+	ctx, span := q.telemetry.Start(ctx, "attachment.enqueue", trace.WithSpanKind(trace.SpanKindProducer))
+	defer func() { tracing.End(span, taskErr) }()
 	if q.client == nil {
 		return fmt.Errorf("REDIS_URL is required to enqueue attachments")
 	}
-	task, err := newProcessAttachmentTask(attachmentID, logging.From(ctx).RequestID)
+	task, err := newProcessAttachmentTask(attachmentID, logging.From(ctx).RequestID, tracing.Inject(ctx))
 	if err != nil {
 		return err
 	}

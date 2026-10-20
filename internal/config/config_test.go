@@ -13,14 +13,17 @@ func TestLoad(t *testing.T) {
 		want    Config
 		wantErr bool
 	}{
-		{name: "defaults", want: Config{WorkerMetricsAddr: "127.0.0.1:9091", MetricsAddr: "127.0.0.1:9090", HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}},
-		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{WorkerMetricsAddr: "127.0.0.1:9091", MetricsAddr: "127.0.0.1:9090", HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second, StorageDir: "data"}},
+		{name: "defaults", want: Config{OTLPEndpoint: "http://localhost:4318", TraceSampler: "parentbased_traceidratio", TraceSampleRatio: 0.1, WorkerMetricsAddr: "127.0.0.1:9091", MetricsAddr: "127.0.0.1:9090", HTTPAddr: ":8080", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}},
+		{name: "overrides", addr: "127.0.0.1:9000", timeout: "5s", want: Config{OTLPEndpoint: "http://localhost:4318", TraceSampler: "parentbased_traceidratio", TraceSampleRatio: 0.1, WorkerMetricsAddr: "127.0.0.1:9091", MetricsAddr: "127.0.0.1:9090", HTTPAddr: "127.0.0.1:9000", ShutdownTimeout: 5 * time.Second, StorageDir: "data"}},
 		{name: "invalid timeout", timeout: "invalid", wantErr: true},
 		{name: "zero timeout", timeout: "0s", wantErr: true},
 		{name: "negative timeout", timeout: "-1s", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+			t.Setenv("OTEL_TRACES_SAMPLER", "")
+			t.Setenv("OTEL_TRACES_SAMPLER_ARG", "")
 			t.Setenv("DATABASE_URL", "")
 			t.Setenv("JWT_SECRET", "")
 			t.Setenv("WS_ORIGIN", "")
@@ -110,6 +113,27 @@ func TestWorkerMetricsAddr(t *testing.T) {
 			cfg, err := Load()
 			if err != nil || cfg.WorkerMetricsAddr != tt.want {
 				t.Fatalf("addr=%s,err=%v", cfg.WorkerMetricsAddr, err)
+			}
+		})
+	}
+}
+
+func TestTracingConfig(t *testing.T) {
+	for _, tt := range []struct {
+		name, sampler, ratio, endpoint string
+		bad                            bool
+	}{
+		{name: "default"}, {name: "disabled", sampler: "always_off", ratio: "0"}, {name: "all", sampler: "always_on", ratio: "1"},
+		{name: "invalid sampler", sampler: "bad", bad: true}, {name: "negative", ratio: "-1", bad: true}, {name: "over one", ratio: "1.1", bad: true},
+		{name: "NaN", ratio: "NaN", bad: true}, {name: "infinite", ratio: "Inf", bad: true}, {name: "malformed", ratio: "bad", bad: true}, {name: "invalid endpoint", endpoint: "tempo:4318", bad: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("OTEL_TRACES_SAMPLER", tt.sampler)
+			t.Setenv("OTEL_TRACES_SAMPLER_ARG", tt.ratio)
+			t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", tt.endpoint)
+			_, err := Load()
+			if (err != nil) != tt.bad {
+				t.Fatalf("error=%v,want bad=%v", err, tt.bad)
 			}
 		})
 	}

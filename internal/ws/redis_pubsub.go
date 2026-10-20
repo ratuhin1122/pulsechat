@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"pulsechat/internal/tracing"
 )
 
 const eventChannel = "pulsechat:events"
@@ -22,6 +24,7 @@ func NewRedisPubSub(client *redis.Client, logger *slog.Logger) *RedisPubSub {
 }
 
 func (b *RedisPubSub) Publish(ctx context.Context, event Event) error {
+	event.TraceContext = tracing.Inject(ctx)
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("encode redis event: %w", err)

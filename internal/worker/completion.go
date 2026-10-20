@@ -8,8 +8,11 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.opentelemetry.io/otel/trace"
+
 	"pulsechat/internal/chat"
 	"pulsechat/internal/store/db"
+	"pulsechat/internal/tracing"
 	"pulsechat/internal/ws"
 )
 
@@ -43,7 +46,9 @@ func (h *AttachmentHandler) ProcessTask(ctx context.Context, task *asynq.Task) e
 	return h.finish(ctx, id)
 }
 
-func (h *AttachmentHandler) finish(ctx context.Context, id pgtype.UUID) error {
+func (h *AttachmentHandler) finish(ctx context.Context, id pgtype.UUID) (finishErr error) {
+	ctx, span := h.telemetry.Start(ctx, "websocket.notify", trace.WithSpanKind(trace.SpanKindProducer))
+	defer func() { tracing.End(span, finishErr) }()
 	if h.publisher == nil {
 		return fmt.Errorf("attachment event publisher is not configured")
 	}

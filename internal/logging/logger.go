@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"log/slog"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 func New(output io.Writer, service string) *slog.Logger {
@@ -23,7 +25,13 @@ func (h *handler) Handle(ctx context.Context, record slog.Record) error {
 	fields := From(ctx)
 	explicit := make(map[string]bool)
 	record.Attrs(func(attr slog.Attr) bool { explicit[attr.Key] = true; return true })
-	for _, attr := range []slog.Attr{slog.String("request_id", fields.RequestID), slog.String("user_id", fields.UserID), slog.String("room_id", fields.RoomID), slog.String("attachment_id", fields.AttachmentID)} {
+	spanContext := trace.SpanContextFromContext(ctx)
+	traceID, spanID := "", ""
+	if spanContext.IsValid() {
+		traceID = spanContext.TraceID().String()
+		spanID = spanContext.SpanID().String()
+	}
+	for _, attr := range []slog.Attr{slog.String("trace_id", traceID), slog.String("span_id", spanID), slog.String("request_id", fields.RequestID), slog.String("user_id", fields.UserID), slog.String("room_id", fields.RoomID), slog.String("attachment_id", fields.AttachmentID)} {
 		if !explicit[attr.Key] {
 			record.AddAttrs(attr)
 		}

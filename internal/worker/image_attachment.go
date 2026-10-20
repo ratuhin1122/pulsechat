@@ -10,9 +10,12 @@ import (
 
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
+	"pulsechat/internal/tracing"
 )
 
-func (h *AttachmentHandler) processImage(ctx context.Context, a db.Attachment) error {
+func (h *AttachmentHandler) processImage(ctx context.Context, a db.Attachment) (processErr error) {
+	ctx, span := h.telemetry.Start(ctx, "attachment.image.process")
+	defer func() { tracing.End(span, processErr) }()
 	if h.images == nil {
 		return fmt.Errorf("image processor is not configured")
 	}

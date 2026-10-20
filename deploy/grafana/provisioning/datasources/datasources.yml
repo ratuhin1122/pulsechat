@@ -21,13 +21,27 @@ datasources:
     isDefault: false
     editable: false
     version: 1
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '"trace_id"\s*:\s*"([0-9a-f]{32})"'
+          datasourceUid: tempo
+          url: '$${__value.raw}'
+          urlDisplayLabel: View trace
 
-  # Enable Tempo after adding its service.
-  # - name: Tempo
-  #   uid: tempo
-  #   type: tempo
-  #   access: proxy
-  #   url: http://tempo:3200
-  #   isDefault: false
-  #   editable: false
-  #   version: 1
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    editable: false
+    version: 1
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -1h
+        spanEndTimeShift: 1h
+        customQuery: true
+        query: '{job="docker"} | json | __error__="" | trace_id="$${__span.traceId}"'

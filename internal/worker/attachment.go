@@ -16,6 +16,7 @@ import (
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store/db"
+	"pulsechat/internal/tracing"
 	"pulsechat/internal/ws"
 )
 
@@ -28,6 +29,7 @@ type Repository interface {
 }
 
 type AttachmentHandler struct {
+	telemetry       *tracing.Runtime
 	metrics         *metrics.Worker
 	repo            Repository
 	logger          *slog.Logger
@@ -95,7 +97,7 @@ func (h *AttachmentHandler) processTask(ctx context.Context, task *asynq.Task) (
 		return h.reject(ctx, attachment, "scan failed: open quarantine: "+err.Error())
 	}
 	scanStarted := time.Now()
-	result, scanErr := h.scanner.Scan(ctx, file)
+	result, scanErr := h.scan(ctx, file)
 	if h.metrics != nil {
 		h.metrics.Scan.Observe(time.Since(scanStarted).Seconds())
 	}

@@ -16,6 +16,7 @@ import (
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
+	"pulsechat/internal/tracing"
 	"pulsechat/internal/worker"
 	"pulsechat/internal/ws"
 )
@@ -35,6 +36,11 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	telemetry, err := tracing.New(ctx, cfg, "worker")
+	if err != nil {
+		return err
+	}
+	defer telemetry.Close(logger)
 	redis, err := worker.NewRedisClient(cfg.RedisURL)
 	if err != nil {
 		return err
@@ -45,7 +51,7 @@ func run(logger *slog.Logger) error {
 	if err := redis.Ping(connectCtx).Err(); err != nil {
 		return fmt.Errorf("connect worker redis: %w", err)
 	}
-	database, err := store.New(connectCtx, cfg.DatabaseURL)
+	database, err := store.New(connectCtx, cfg.DatabaseURL, telemetry.PGX())
 	if err != nil {
 		return err
 	}
@@ -76,10 +82,10 @@ func run(logger *slog.Logger) error {
 	})
 	meter := metrics.NewWorker()
 	mux := asynq.NewServeMux()
-	handler := worker.NewAttachmentHandler(database, disk, scanner, logger, images).WithMetrics(meter)
+	handler := worker.NewAttachmentHandler(database, disk, scanner, logger, images).WithMetrics(meter).WithTracing(telemetry)
 	handler.ConfigureMedia(worker.FFProbe{}, cfg.InspectArchives)
 	handler.ConfigureCompletion(database, ws.NewRedisPubSub(redis, logger))
-	mux.Handle(worker.ProcessAttachment, worker.LogTasks(logger, handler))
+	mux.Handle(worker.ProcessAttachment, worker.TraceTasks(telemetry, worker.LogTasks(logger, handler)))
 	inspector := asynq.NewInspectorFromRedisClient(redis)
 	return serveWorker(ctx, cfg, server, mux, inspector, meter, logger)
 }

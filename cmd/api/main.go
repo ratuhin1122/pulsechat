@@ -18,6 +18,7 @@ import (
 	"pulsechat/internal/metrics"
 	"pulsechat/internal/storage"
 	"pulsechat/internal/store"
+	"pulsechat/internal/tracing"
 	"pulsechat/internal/upload"
 	"pulsechat/internal/worker"
 )
@@ -46,18 +47,23 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	telemetry, err := tracing.New(ctx, cfg, "api")
+	if err != nil {
+		return err
+	}
+	defer telemetry.Close(logger)
 	tokens, err := auth.NewTokens(cfg.JWTSecret)
 	if err != nil {
 		return err
 	}
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	database, err := store.New(connectCtx, cfg.DatabaseURL)
+	database, err := store.New(connectCtx, cfg.DatabaseURL, telemetry.PGX())
 	cancel()
 	if err != nil {
 		return err
 	}
 	defer database.Close()
-	websocketHandler, closeRealtime, err := newRealtime(ctx, cfg, database, tokens, logger, meter)
+	websocketHandler, closeRealtime, err := newRealtime(ctx, cfg, database, tokens, logger, meter, telemetry)
 	if err != nil {
 		return err
 	}
@@ -71,6 +77,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	attachmentQueue.WithTracing(telemetry)
 	defer attachmentQueue.Close()
 	uploadLimiter, err := upload.NewMemoryLimiter(10, time.Minute)
 	if err != nil {
@@ -90,7 +97,7 @@ func run(logger *slog.Logger) error {
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.RequestID(meter.Middleware(mux, monitor.Wrap(mux, limits.Wrap(mux)))),
+		Handler:           httpserver.RequestID(telemetry.HTTP(mux, meter.Middleware(mux, monitor.Wrap(mux, limits.Wrap(mux))))),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}

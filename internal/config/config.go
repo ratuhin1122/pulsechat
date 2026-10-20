@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"strconv"
@@ -9,6 +10,9 @@ import (
 )
 
 type Config struct {
+	OTLPEndpoint      string
+	TraceSampler      string
+	TraceSampleRatio  float64
 	DevHTTP           bool
 	TrustedProxyCIDRs string
 	InspectArchives   bool
@@ -25,7 +29,29 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	cfg := Config{HTTPAddr: ":8080", MetricsAddr: "127.0.0.1:9090", WorkerMetricsAddr: "127.0.0.1:9091", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}
+	cfg := Config{OTLPEndpoint: "http://localhost:4318", TraceSampler: "parentbased_traceidratio", TraceSampleRatio: 0.1, HTTPAddr: ":8080", MetricsAddr: "127.0.0.1:9090", WorkerMetricsAddr: "127.0.0.1:9091", ShutdownTimeout: 10 * time.Second, StorageDir: "data"}
+	if value := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); value != "" {
+		cfg.OTLPEndpoint = value
+	}
+	endpoint, err := url.Parse(cfg.OTLPEndpoint)
+	if err != nil || endpoint.Host == "" || endpoint.User != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.RawQuery != "" || endpoint.Fragment != "" {
+		return Config{}, fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT must be an HTTP(S) base URL without credentials, query or fragment")
+	}
+	if value := os.Getenv("OTEL_TRACES_SAMPLER"); value != "" {
+		cfg.TraceSampler = value
+	}
+	switch cfg.TraceSampler {
+	case "parentbased_traceidratio", "always_on", "always_off":
+	default:
+		return Config{}, fmt.Errorf("unsupported OTEL_TRACES_SAMPLER")
+	}
+	if value := os.Getenv("OTEL_TRACES_SAMPLER_ARG"); value != "" {
+		ratio, err := strconv.ParseFloat(value, 64)
+		if err != nil || math.IsNaN(ratio) || math.IsInf(ratio, 0) || ratio < 0 || ratio > 1 {
+			return Config{}, fmt.Errorf("OTEL_TRACES_SAMPLER_ARG must be between 0 and 1")
+		}
+		cfg.TraceSampleRatio = ratio
+	}
 	if directory := os.Getenv("STORAGE_DIR"); directory != "" {
 		cfg.StorageDir = directory
 	}

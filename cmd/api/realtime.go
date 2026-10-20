@@ -12,10 +12,11 @@ import (
 	"pulsechat/internal/auth"
 	"pulsechat/internal/config"
 	"pulsechat/internal/metrics"
+	"pulsechat/internal/tracing"
 	"pulsechat/internal/ws"
 )
 
-func newRealtime(ctx context.Context, cfg config.Config, repo ws.Repository, tokens *auth.Tokens, logger *slog.Logger, meter *metrics.Metrics) (*ws.Handler, func(), error) {
+func newRealtime(ctx context.Context, cfg config.Config, repo ws.Repository, tokens *auth.Tokens, logger *slog.Logger, meter *metrics.Metrics, telemetry *tracing.Runtime) (*ws.Handler, func(), error) {
 	ctx, cancel := context.WithCancel(ctx)
 	var client *redis.Client
 	var publisher *ws.RedisPubSub
@@ -60,6 +61,7 @@ func newRealtime(ctx context.Context, cfg config.Config, repo ws.Repository, tok
 		cleanup()
 		return nil, nil, err
 	}
+	handler.WithTracing(telemetry)
 	if publisher != nil {
 		stopSubscription, err = publisher.Subscribe(ctx, handler.DeliverEvent)
 		if err != nil {

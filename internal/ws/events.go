@@ -3,14 +3,20 @@ package ws
 import (
 	"context"
 	"encoding/json"
+
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
+
+	"pulsechat/internal/tracing"
 )
 
 // Event is the internal transport envelope, never the browser protocol.
 type Event struct {
-	RoomID   string          `json:"room_id,omitempty"`
-	UserIDs  []string        `json:"user_ids,omitempty"`
-	Payload  json.RawMessage `json:"payload,omitempty"`
-	Presence *presenceEvent  `json:"presence,omitempty"`
+	TraceContext propagation.MapCarrier `json:"trace_context,omitempty"`
+	RoomID       string                 `json:"room_id,omitempty"`
+	UserIDs      []string               `json:"user_ids,omitempty"`
+	Payload      json.RawMessage        `json:"payload,omitempty"`
+	Presence     *presenceEvent         `json:"presence,omitempty"`
 }
 
 type Publisher interface {
@@ -51,7 +57,10 @@ func (h *Hub) deliver(event Event) {
 	}
 }
 
-func (h *Handler) DeliverEvent(ctx context.Context, event Event) error {
+func (h *Handler) DeliverEvent(ctx context.Context, event Event) (deliverErr error) {
+	ctx = tracing.Extract(ctx, event.TraceContext)
+	ctx, span := h.telemetry.Start(ctx, "websocket.notify.deliver", trace.WithSpanKind(trace.SpanKindConsumer))
+	defer func() { tracing.End(span, deliverErr) }()
 	if event.Presence == nil {
 		h.hub.deliver(event)
 		return nil

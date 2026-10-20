@@ -13,6 +13,7 @@ import (
 	"pulsechat/internal/chat"
 	"pulsechat/internal/logging"
 	"pulsechat/internal/store/db"
+	"pulsechat/internal/tracing"
 )
 
 const (
@@ -33,6 +34,7 @@ type Repository interface {
 }
 
 type Handler struct {
+	telemetry  *tracing.Runtime
 	ctx        context.Context
 	repo       Repository
 	tokens     *auth.Tokens
@@ -52,6 +54,8 @@ func New(ctx context.Context, repo Repository, tokens *auth.Tokens, hub *Hub, pr
 	}
 	return &Handler{ctx: ctx, repo: repo, tokens: tokens, hub: hub, presence: presence, logger: logger, origin: origin}, nil
 }
+
+func (h *Handler) WithTracing(telemetry *tracing.Runtime) *Handler { h.telemetry = telemetry; return h }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /ws", h)

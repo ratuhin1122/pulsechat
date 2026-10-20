@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"go.opentelemetry.io/otel/trace"
 	"sync"
 	"testing"
 )
@@ -31,5 +32,26 @@ func TestScopesAreIsolatedAndConcurrent(t *testing.T) {
 	}
 	if bytes.Count(output.Bytes(), []byte(`"attachment_id"`)) != 1 {
 		t.Fatal("duplicate correlation keys")
+	}
+}
+
+func TestTraceIDInJSON(t *testing.T) {
+	id, err := trace.TraceIDFromHex("0123456789abcdef0123456789abcdef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spanID, err := trace.SpanIDFromHex("0123456789abcdef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{TraceID: id, SpanID: spanID}))
+	var output bytes.Buffer
+	New(&output, "api").InfoContext(ctx, "traced")
+	var record map[string]any
+	if err := json.Unmarshal(output.Bytes(), &record); err != nil {
+		t.Fatal(err)
+	}
+	if record["trace_id"] != id.String() || record["span_id"] != spanID.String() {
+		t.Fatal("log trace correlation missing")
 	}
 }

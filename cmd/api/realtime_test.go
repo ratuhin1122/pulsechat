@@ -35,7 +35,7 @@ func TestRealtimeSelection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			handler, cleanup, err := newRealtime(ctx, config.Config{RedisURL: tt.url}, nil, tokens, slog.New(slog.NewTextHandler(io.Discard, nil)), metrics.New())
+			handler, cleanup, err := newRealtime(ctx, config.Config{RedisURL: tt.url}, nil, tokens, slog.New(slog.NewTextHandler(io.Discard, nil)), metrics.New(), nil)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("newRealtime() error = %v", err)
 			}
