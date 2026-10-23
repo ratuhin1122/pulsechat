@@ -53,19 +53,19 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         <span className="eyebrow">YOUR PEOPLE. YOUR PLACE.</span>
         <h1 id="auth-title">{register ? 'Make yourself at home.' : 'Welcome back.'}</h1>
         <p className="muted">{register ? 'Create an account and find your conversations.' : 'A good conversation is just a sign-in away.'}</p>
-        <form className="auth-form" onSubmit={(event) => { void submit(event); }} aria-busy={busy}>
+        <form className="auth-form" autoComplete="off" onSubmit={(event) => { void submit(event); }} aria-busy={busy}>
           {register && <label>Username
             <input name="username" autoComplete="username" required maxLength={64} value={username}
               onChange={(event) => setUsername(event.target.value)} disabled={busy} />
           </label>}
           <label>Email address
-            <input name="email" type="email" autoComplete="email" inputMode="email" required maxLength={254}
+            <input name="email" type="email" autoComplete="off" inputMode="email" required maxLength={254}
               placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy} />
           </label>
           <label htmlFor="password">Password</label>
           <div className="password-field">
             <input id="password" name="password" type={visible ? 'text' : 'password'} required
-              minLength={register ? 8 : undefined} maxLength={1024} autoComplete={register ? 'new-password' : 'current-password'}
+              minLength={register ? 8 : undefined} maxLength={1024} autoComplete={register ? 'new-password' : 'off'}
               value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy}
               aria-describedby={register ? 'password-hint' : undefined} />
             <button type="button" className="password-toggle" aria-pressed={visible}

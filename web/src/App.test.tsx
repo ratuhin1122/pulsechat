@@ -47,6 +47,8 @@ it('signs in, lists and filters rooms, selects a room, and signs out', async () 
     return Response.json(rooms);
   });
   await screen.findByRole('heading', { name: 'Welcome back.' });
+  expect(screen.getByLabelText('Email address').getAttribute('autocomplete')).toBe('off');
+  expect(screen.getByLabelText('Password', { exact: true }).getAttribute('autocomplete')).toBe('off');
   await user.type(screen.getByLabelText('Email address'), 'you@example.com');
   await user.type(screen.getByLabelText('Password', { exact: true }), 'password123');
   await user.click(screen.getByRole('button', { name: 'Sign in' }));
