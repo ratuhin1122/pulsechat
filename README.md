@@ -1,8 +1,43 @@
-# PulseChat
+<h1 align="center">PulseChat</h1>
 
-For local development, start Docker Desktop and run `make start`, then open **http://localhost:8080**. Your root `.env` is loaded automatically. Use `make stop`, `make logs`, and `make ps` to manage it. See [deployment instructions](deploy/README.md) for local HTTP and production HTTPS details.
+<p align="center">
+  <strong>Your people. One place.</strong><br />
+  Real-time conversations, shared rooms, and media messaging built with Go and React.
+</p>
 
-PulseChat is a high-performance, secure real-time messaging platform built with Go, PostgreSQL, Redis, and modern web technologies. Engineered with a security-first mindset, PulseChat features an asynchronous, sandboxed file upload pipeline that isolates untrusted uploads, scans for malware via ClamAV, strips metadata and transcodes images using libvips, and broadcasts real-time updates through WebSockets.
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&amp;logo=go&amp;logoColor=white" alt="Go 1.26" />
+  <img src="https://img.shields.io/badge/React-20232A?style=flat-square&amp;logo=react&amp;logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&amp;logo=typescript&amp;logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&amp;logo=postgresql&amp;logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&amp;logo=redis&amp;logoColor=white" alt="Redis" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&amp;logo=docker&amp;logoColor=white" alt="Docker Compose" />
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> &middot;
+  <a href="#upload-pipeline-architecture">Architecture</a> &middot;
+  <a href="#observability">Observability</a> &middot;
+  <a href="deploy/README.md">Deployment</a>
+</p>
+
+PulseChat brings direct messages, group rooms, online presence, and image, document, and voice sharing into one responsive web app. WebSockets deliver live updates, while background workers scan uploads with ClamAV and process images with libvips before making them available.
+
+<p align="center">
+  <img src="docs/assets/pulsechat-demo.gif" alt="Animated demonstration of PulseChat conversations between two browser windows" width="100%" />
+  <br />
+  <sub>PulseChat in action.</sub>
+</p>
+
+### Run locally
+
+Start Docker Desktop, configure the root `.env`, and run:
+
+```sh
+make start
+```
+
+Open **[http://localhost:8080](http://localhost:8080)**. The root `.env` is loaded automatically. Use `make stop`, `make logs`, and `make ps` to manage the app. See the [deployment instructions](deploy/README.md) for local HTTP and production HTTPS details.
 
 ---
 
